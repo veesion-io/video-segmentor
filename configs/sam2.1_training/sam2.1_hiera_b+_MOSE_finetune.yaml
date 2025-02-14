@@ -6,7 +6,7 @@ data:
       _target_: training.dataset.vos_raw_dataset.JSONRawDataset
       img_folder: /home/veesion/People-detector/videos  # Path to video frames
       gt_folder: /home/veesion/People-detector/sam2_dataset  # Path to SAM2 masks
-      file_list_txt: null  # Optional: Provide a file list with selected video samples
+      file_list_txt: /home/veesion/People-detector/sam2_dataset/dataset.txt  # Optional: Provide a file list with selected video samples
       ann_every: 4  # Annotation frequency (adjust if needed)
     sampler:
       _target_: training.dataset.vos_sampler.RandomUniformSampler
