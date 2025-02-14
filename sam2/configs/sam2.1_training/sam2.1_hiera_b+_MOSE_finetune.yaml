@@ -11,13 +11,13 @@ scratch:
   phases_per_epoch: 1
   num_epochs: 40
 
+
 dataset:
   # PATHS to Dataset
-  img_folder: null # PATH to MOSE JPEGImages folder
-  gt_folder: null  # PATH to MOSE Annotations folder
-  file_list_txt: training/assets/MOSE_sample_train_list.txt # Optional PATH to filelist containing a subset of videos to be used for training
+  img_folder: /home/veesion/People-detector/sam2_dataset/JPEGImages # PATH to MOSE JPEGImages folder
+  gt_folder: /home/veesion/People-detector/sam2_dataset/Annotations  # PATH to MOSE Annotations folder
+  file_list_txt: /home/veesion/People-detector/sam2_dataset/dataset.txt # Optional PATH to filelist containing a subset of videos to be used for training
   multiplier: 2
-
 # Video transforms
 vos:
   train_transforms:
