@@ -64,7 +64,7 @@ class VideoMaskDataset(Dataset):
                 if frame_id in data["tracks"][track_id]
             ]
             frames.append(frame_data)
-            masks.append(np.stack(mask_data) if mask_data else np.zeros((1, 256, 256)))
+            masks.append(np.stack(mask_data) if mask_data else np.zeros((256, 256)))
 
         cap.release()
 
