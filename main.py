@@ -32,7 +32,10 @@ class VideoMaskDataset(Dataset):
         frames = []
         masks = []
 
-        for frame_id in sorted(data["tracks"].values())[0]:  # Iterate over frames
+        all_frame_ids = set(
+            frame_id for track in data["tracks"].values() for frame_id in track.keys()
+        )
+        for frame_id in sorted(all_frame_ids):  # Iterate over frames
             frame_data = [
                 data["tracks"][track_id][frame_id][0]
                 for track_id in data["tracks"]
