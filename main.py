@@ -67,9 +67,7 @@ class VideoMaskDataset(Dataset):
             mask_data = [
                 cv2.drawContours(
                     np.zeros((256, 256), dtype=np.uint8),
-                    data["tracks"][track_id].get(frame_id, [])[
-                        1
-                    ],  # Get contours safely
+                    data["tracks"][track_id][frame_id][1],
                     -1,
                     255,
                     thickness=cv2.FILLED,
@@ -80,10 +78,10 @@ class VideoMaskDataset(Dataset):
             if mask_data:
                 print(np.stack(mask_data).shape)
             else:
-                print((256, 256))
+                print((1, 256, 256))
 
             frames.append(frame_data)
-            masks.append(np.stack(mask_data) if mask_data else np.zeros((256, 256)))
+            masks.append(np.stack(mask_data) if mask_data else np.zeros((1, 256, 256)))
 
         cap.release()
 
