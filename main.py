@@ -16,8 +16,19 @@ import cv2
 import cv2
 
 
+import torch
+import numpy as np
+import cv2
+from torch.utils.data import Dataset
+import pickle
+import os
+import torchvision.transforms as transforms
+
+
 class VideoMaskDataset(Dataset):
-    def __init__(self, data_dir, target_fps=10, duration=5, transform=None):
+    def __init__(
+        self, data_dir, target_fps=10, duration=5, num_classes=13, transform=None
+    ):
         self.data_files = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
@@ -26,6 +37,7 @@ class VideoMaskDataset(Dataset):
         self.video_path = "/home/veesion/Bag-detector/videos/"
         self.target_fps = target_fps
         self.num_frames = target_fps * duration
+        self.num_classes = num_classes
         self.transform = transform
 
     def __len__(self):
@@ -37,7 +49,9 @@ class VideoMaskDataset(Dataset):
             data = pickle.load(f)
 
         frames = []
-        masks = []
+        masks = np.zeros(
+            (self.num_classes, self.num_frames, 256, 256), dtype=np.uint8
+        )  # (C, T, H, W)
 
         video_name = os.path.basename(pkl_file).replace(".pkl", ".mp4")
         cap = cv2.VideoCapture(os.path.join(self.video_path, video_name))
@@ -56,7 +70,7 @@ class VideoMaskDataset(Dataset):
             if i * frame_interval < total_frames
         ]
 
-        for frame_id in frame_ids:
+        for t, frame_id in enumerate(frame_ids):  # t is the index in our time dimension
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
             ret, frame = cap.read()
             if ret:
@@ -64,32 +78,25 @@ class VideoMaskDataset(Dataset):
             else:
                 frame_data = torch.zeros((3, 256, 256))  # Placeholder if frame missing
 
-            mask_data = [
-                cv2.drawContours(
-                    np.zeros((256, 256), dtype=np.uint8),
-                    data["tracks"][track_id][frame_id][1],
-                    -1,
-                    255,
-                    thickness=cv2.FILLED,
-                )
-                for track_id in data["tracks"]
-                if frame_id in data["tracks"][track_id]
-            ]
-            if mask_data:
-                print(np.stack(mask_data).shape)
-            else:
-                print((1, 256, 256))
-
             frames.append(frame_data)
-            masks.append(np.stack(mask_data) if mask_data else np.zeros((1, 256, 256)))
+
+            # Process masks for each track_id
+            for track_id in data["tracks"]:
+                if frame_id in data["tracks"][track_id]:
+                    contours = data["tracks"][track_id][frame_id][1]  # Extract contours
+                    class_id = data["classes"][track_id]  # Get class for this track_id
+                    if (
+                        0 <= class_id < self.num_classes
+                    ):  # Ensure class_id is within range
+                        cv2.drawContours(
+                            masks[class_id, t], contours, -1, 255, thickness=cv2.FILLED
+                        )
 
         cap.release()
 
         frames = torch.stack(frames)  # (T, C, H, W)
         frames = frames.permute(1, 0, 2, 3)  # (C, T, H, W)
-        masks = torch.tensor(np.array(masks), dtype=torch.float32).unsqueeze(
-            0
-        )  # (1, T, H, W)
+        masks = torch.tensor(masks, dtype=torch.float32)  # (num_classes, T, H, W)
 
         if self.transform:
             frames = self.transform(frames)
