@@ -29,13 +29,15 @@ class VideoMaskDataset(Dataset):
         return len(self.data_files)
 
     def __getitem__(self, idx):
-        with open(self.data_files[idx], "rb") as f:
+        pkl_file = self.data_files[idx]
+        with open(pkl_file, "rb") as f:
             data = pickle.load(f)
 
         frames = []
         masks = []
 
-        cap = cv2.VideoCapture(self.video_path)
+        video_name = os.path.basename(pkl_file).replace(".pkl", ".mp4")
+        cap = cv2.VideoCapture(os.path.join(self.video_path, video_name))
         video_fps = cap.get(cv2.CAP_PROP_FPS)
         frame_interval = max(1, int(video_fps / self.target_fps))
 
