@@ -13,6 +13,9 @@ import resnext
 import cv2
 
 
+import cv2
+
+
 class VideoMaskDataset(Dataset):
     def __init__(self, data_dir, target_fps=10, duration=5, transform=None):
         self.data_files = [
@@ -39,23 +42,34 @@ class VideoMaskDataset(Dataset):
         video_name = os.path.basename(pkl_file).replace(".pkl", ".mp4")
         cap = cv2.VideoCapture(os.path.join(self.video_path, video_name))
         video_fps = cap.get(cv2.CAP_PROP_FPS)
-        frame_interval = max(1, int(video_fps / self.target_fps))
 
-        all_frame_ids = sorted(
-            frame_id for track in data["tracks"].values() for frame_id in track.keys()
-        )[: self.num_frames]  # Limit to the specified duration
+        if not video_fps or video_fps <= 0:
+            cap.release()
+            raise ValueError(f"Invalid FPS detected in video: {video_name}")
 
-        for i, frame_id in enumerate(all_frame_ids):  # Iterate over frames
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id * frame_interval)
+        # Compute the exact frame IDs to fetch
+        frame_interval = max(1, int(round(video_fps / self.target_fps)))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_ids = [
+            i * frame_interval
+            for i in range(self.num_frames)
+            if i * frame_interval < total_frames
+        ]
+
+        for frame_id in frame_ids:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
             ret, frame = cap.read()
             if ret:
                 frame_data = transforms.ToTensor()(frame)
             else:
                 frame_data = torch.zeros((3, 256, 256))  # Placeholder if frame missing
+
             mask_data = [
                 cv2.drawContours(
                     np.zeros((256, 256), dtype=np.uint8),
-                    data["tracks"][track_id][frame_id][1],
+                    data["tracks"][track_id].get(frame_id, [])[
+                        1
+                    ],  # Get contours safely
                     -1,
                     255,
                     thickness=cv2.FILLED,
@@ -63,11 +77,8 @@ class VideoMaskDataset(Dataset):
                 for track_id in data["tracks"]
                 if frame_id in data["tracks"][track_id]
             ]
+
             frames.append(frame_data)
-            if mask_data:
-                print(np.stack(mask_data).shape)
-            else:
-                print((256, 256))
             masks.append(np.stack(mask_data) if mask_data else np.zeros((256, 256)))
 
         cap.release()
