@@ -10,16 +10,19 @@ import numpy as np
 import resnext
 
 
-# ------------------------------
-# Dataset
-# ------------------------------
+import cv2
+
+
 class VideoMaskDataset(Dataset):
-    def __init__(self, data_dir, transform=None):
+    def __init__(self, data_dir, target_fps=10, duration=5, transform=None):
         self.data_files = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
             if f.endswith(".pkl")
         ]
+        self.video_path = "/home/veesion/Bag-detector/videos/"
+        self.target_fps = target_fps
+        self.num_frames = target_fps * duration
         self.transform = transform
 
     def __len__(self):
@@ -32,29 +35,35 @@ class VideoMaskDataset(Dataset):
         frames = []
         masks = []
 
-        all_frame_ids = set(
+        cap = cv2.VideoCapture(self.video_path)
+        video_fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_interval = max(1, int(video_fps / self.target_fps))
+
+        all_frame_ids = sorted(
             frame_id for track in data["tracks"].values() for frame_id in track.keys()
-        )
-        for frame_id in sorted(all_frame_ids):  # Iterate over frames
-            frame_data = [
-                data["tracks"][track_id][frame_id][0]
-                for track_id in data["tracks"]
-                if frame_id in data["tracks"][track_id]
-            ]
+        )[: self.num_frames]  # Limit to the specified duration
+
+        for i, frame_id in enumerate(all_frame_ids):  # Iterate over frames
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id * frame_interval)
+            ret, frame = cap.read()
+            if ret:
+                frame_data = transforms.ToTensor()(frame)
+            else:
+                frame_data = torch.zeros((3, 256, 256))  # Placeholder if frame missing
+
             mask_data = [
                 data["tracks"][track_id][frame_id][1]
                 for track_id in data["tracks"]
                 if frame_id in data["tracks"][track_id]
             ]
 
-            frames.append(
-                np.stack(frame_data) if frame_data else np.zeros((1, 3, 256, 256))
-            )
+            frames.append(frame_data)
             masks.append(np.stack(mask_data) if mask_data else np.zeros((1, 256, 256)))
 
-        frames = torch.tensor(np.array(frames), dtype=torch.float32).permute(
-            1, 0, 2, 3
-        )  # (C, T, H, W)
+        cap.release()
+
+        frames = torch.stack(frames)  # (T, C, H, W)
+        frames = frames.permute(1, 0, 2, 3)  # (C, T, H, W)
         masks = torch.tensor(np.array(masks), dtype=torch.float32).unsqueeze(
             0
         )  # (1, T, H, W)
