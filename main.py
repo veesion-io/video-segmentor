@@ -149,5 +149,8 @@ def train_model(data_dir, epochs=10, batch_size=4, lr=1e-4):
 # ------------------------------
 if __name__ == "__main__":
     train_model(
-        "/home/veesion/Bag-detector/valid_masks/", epochs=20, batch_size=4, lr=1e-4
+        "/home/veesion/Bag-detector/valid_masks_tracks/",
+        epochs=20,
+        batch_size=4,
+        lr=1e-4,
     )
