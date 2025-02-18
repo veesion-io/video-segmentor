@@ -52,13 +52,17 @@ class VideoMaskDataset(Dataset):
                 frame_data = transforms.ToTensor()(frame)
             else:
                 frame_data = torch.zeros((3, 256, 256))  # Placeholder if frame missing
-
             mask_data = [
-                data["tracks"][track_id][frame_id][1]
+                cv2.drawContours(
+                    np.zeros((256, 256), dtype=np.uint8),
+                    data["tracks"][track_id][frame_id][1],
+                    -1,
+                    255,
+                    thickness=cv2.FILLED,
+                )
                 for track_id in data["tracks"]
                 if frame_id in data["tracks"][track_id]
             ]
-
             frames.append(frame_data)
             masks.append(np.stack(mask_data) if mask_data else np.zeros((1, 256, 256)))
 
