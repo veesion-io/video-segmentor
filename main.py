@@ -74,7 +74,7 @@ class VideoMaskDataset(Dataset):
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
             ret, frame = cap.read()
             if ret:
-                frame_data = transforms.ToTensor()(cv2.resize(frame, 256))
+                frame_data = transforms.ToTensor()(cv2.resize(frame, (256, 256)))
             else:
                 frame_data = torch.zeros((3, 256, 256))  # Placeholder if frame missing
 
