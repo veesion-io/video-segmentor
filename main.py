@@ -223,7 +223,7 @@ class TemporalUNetTransformer(nn.Module):
 
     def forward(self, x):
         self.feature_maps = {}  # Reset stored feature maps
-        x = self.swin3d(x)  # Forward pass through Swin3D (hooks will capture features)
+        _ = self.swin3d(x)  # Forward pass through Swin3D (hooks will capture features)
 
         # Extract permuted feature maps
         x1 = self.feature_maps["stage1"]  # (B, C, T, H, W)
@@ -232,6 +232,7 @@ class TemporalUNetTransformer(nn.Module):
         x4 = self.feature_maps["stage4"]  # (B, C, T, H, W)
 
         # Decoder with Skip Connections
+        print("shape before 1st interp, target size", x4.shape)
         x = self.up1(x4)
         print(x.shape, "shape before 1st interp, target size", x3.shape)
         x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
