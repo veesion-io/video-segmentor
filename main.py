@@ -41,12 +41,22 @@ class VideoMaskDataset(Dataset):
         duration=VIDEO_DURATION,
         num_classes=NUM_CLASSES,
         transform=None,
+        mode="train",
     ):
-        self.data_files = [
-            os.path.join(data_dir, f)
-            for f in os.listdir(data_dir)
-            if f.endswith(".pkl")
-        ]
+        self.mode = mode
+        self.data_files = sorted(
+            [
+                os.path.join(data_dir, f)
+                for f in os.listdir(data_dir)
+                if f.endswith(".pkl")
+            ]
+        )
+        np.random.seed(42)
+        np.random.shuffle(self.data_files)
+        if mode == "train":
+            self.data_files = self.data_files[: int(0.9 * len(self.data_files))]
+        else:
+            self.data_files = self.data_files[int(0.9 * len(self.data_files)) :]
         self.video_path = "/home/veesion/Bag-detector/videos/"
         self.target_fps = target_fps
         self.duration = duration
@@ -274,8 +284,9 @@ class TemporalUNetTransformer(nn.Module):
 
 def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = VideoMaskDataset(
+    train_dataset = VideoMaskDataset(
         data_dir,
+        mode="train",
         transform=transforms.Compose(
             [
                 transforms.ConvertImageDtype(torch.float32),  # Rescale to [0,1]
@@ -285,7 +296,27 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
             ]
         ),
     )
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    val_dataset = VideoMaskDataset(
+        data_dir,
+        mode="val",
+        transform=transforms.Compose(
+            [
+                transforms.ConvertImageDtype(torch.float32),  # Rescale to [0,1]
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),  # ImageNet normalization
+            ]
+        ),
+    )
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=8
+    )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=8,
+    )
 
     model = TemporalUNetTransformer(NUM_CLASSES, num_frames=NUM_FRAMES).to(device)
     model = torch.compile(model)
@@ -302,7 +333,7 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
         total_pixels = 0
         baseline_correct_pixels = 0  # When prediction is always zero
 
-        for frames, masks in dataloader:
+        for frames, masks in train_dataloader:
             with torch.amp.autocast("cuda", dtype=torch.float32):
                 frames, masks = frames.to(device), masks.to(device)
 
@@ -313,7 +344,6 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
                 optimizer.step()
 
             epoch_loss += loss.item()
-            print(outputs[0, :, 13, 112, 112])
             # Compute pixel-wise accuracy
             predicted = (outputs > 0).float()  # Convert logits to binary predictions
             correct_pixels += (predicted == masks).sum().item()
@@ -328,7 +358,39 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
         )
 
         print(
-            f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss / len(dataloader):.4f}, "
+            f"Epoch [{epoch + 1}/{epochs}], Train loss: {epoch_loss / len(train_dataloader):.4f}, "
+            f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
+        )
+        model.eval()
+        epoch_loss = 0
+        correct_pixels = 0
+        total_pixels = 0
+        baseline_correct_pixels = 0  # When prediction is always zero
+
+        for frames, masks in val_dataloader:
+            with torch.amp.autocast("cuda", dtype=torch.float32):
+                frames, masks = frames.to(device), masks.to(device)
+                with torch.no_grad():
+                    outputs = model(frames)
+                    loss = criterion(outputs, masks)
+
+            epoch_loss += loss.item()
+            # print(outputs[0, :, 13, 112, 112])
+            # Compute pixel-wise accuracy
+            predicted = (outputs > 0).float()  # Convert logits to binary predictions
+            correct_pixels += (predicted == masks).sum().item()
+            total_pixels += masks.numel()
+
+            # Baseline accuracy (assume all predictions are 0)
+            baseline_correct_pixels += (masks == 0).sum().item()
+
+        pixel_accuracy = correct_pixels / total_pixels if total_pixels > 0 else 0
+        baseline_accuracy = (
+            baseline_correct_pixels / total_pixels if total_pixels > 0 else 0
+        )
+
+        print(
+            f"Epoch [{epoch + 1}/{epochs}], Val loss: {epoch_loss / len(val_dataloader):.4f}, "
             f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
         )
 
