@@ -231,9 +231,7 @@ class TemporalUNetTransformer(nn.Module):
         x4 = self.feature_maps["stage4"]  # (B, C, T, H, W)
 
         # Decoder with Skip Connections
-        print("1", x4.size())
         x = self.up1(x4)
-        print(x.size())
         x = x[:, :, :-1]  # go from T = 26 to T = 25
         x3 = F.interpolate(x3, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
@@ -247,14 +245,7 @@ class TemporalUNetTransformer(nn.Module):
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
         x = self.up4(x)
-        print(x.size())
         x = self.final_conv(x)  # Final output
-        x = F.interpolate(
-            x,
-            size=(self.num_frames, self.image_size, self.image_size),
-            mode="trilinear",
-            align_corners=False,
-        )
 
         return x
 
