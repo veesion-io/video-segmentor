@@ -243,17 +243,17 @@ class TemporalUNetTransformer(nn.Module):
         x = self.up1(x4)
         x = x[:, :, :-1]  # go from T = 26 to T = 25
         x = F.leaky_relu(x, 0.2)
-        x3 = F.interpolate(x3, size=x.shape[2:], mode="linear", align_corners=False)
+        x3 = F.interpolate(x3, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
 
         x = self.up2(x)
         x = F.leaky_relu(x, 0.2)
-        x2 = F.interpolate(x2, size=x.shape[2:], mode="linear", align_corners=False)
+        x2 = F.interpolate(x2, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x2], dim=1)  # Skip connection
 
         x = self.up3(x)
         x = F.leaky_relu(x, 0.2)
-        x1 = F.interpolate(x1, size=x.shape[2:], mode="linear", align_corners=False)
+        x1 = F.interpolate(x1, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
         x = self.up4(x)
@@ -299,7 +299,7 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
         baseline_correct_pixels = 0  # When prediction is always zero
 
         for frames, masks in dataloader:
-            with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+            with torch.amp.autocast("cuda", dtype=torch.float16):
                 frames, masks = frames.to(device), masks.to(device)
 
                 optimizer.zero_grad()
