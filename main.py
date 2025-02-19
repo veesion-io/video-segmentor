@@ -133,7 +133,7 @@ class TemporalUNetTransformer(nn.Module):
             nn.ConvTranspose3d(
                 encoder_output_dim,
                 encoder_output_dim // 2,
-                kernel_size=(3, 5, 5),
+                kernel_size=3,
                 stride=2,
                 padding=1,
             ),
@@ -167,7 +167,7 @@ class TemporalUNetTransformer(nn.Module):
                 out_channels,
                 kernel_size=3,
                 stride=2,
-                padding=1,
+                padding=(2, 1, 1),
             ),
             nn.Sigmoid(),
         )
