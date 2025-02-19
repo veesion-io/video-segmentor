@@ -121,14 +121,6 @@ class TemporalUNetTransformer(nn.Module):
         # UNet Encoder
         self.encoder = resnext.resnet50()
 
-        # Transformer for Temporal Modeling
-        self.temporal_transformer = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(
-                d_model=embed_dim, nhead=num_heads, batch_first=True
-            ),
-            num_layers=depth,
-        )
-
         # UNet Decoder
         self.decoder = nn.Sequential(
             nn.ConvTranspose3d(embed_dim, 64, kernel_size=3, padding=1),
@@ -139,13 +131,6 @@ class TemporalUNetTransformer(nn.Module):
 
     def forward(self, x):
         x = self.encoder(x)  # (B, C, T, H, W)
-
-        B, C, T, H, W = x.shape
-        x = x.permute(0, 2, 1, 3, 4).reshape(
-            B, T, C * H * W
-        )  # Flatten for transformer (B, T, D)
-        x = self.temporal_transformer(x)
-        x = x.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # Restore shape
 
         x = self.decoder(x)  # (B, 1, T, H, W)
         return x
