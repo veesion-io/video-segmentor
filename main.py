@@ -165,10 +165,10 @@ class TemporalUNetTransformer(nn.Module):
         self.up1 = nn.ConvTranspose3d(
             encoder_channels[-1],
             decoder_channels[0],
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            output_padding=1,
+            kernel_size=(3, 5, 5),
+            stride=(2, 4, 4),
+            padding=(1, 3, 3),
+            output_padding=(1, 3, 3),
         )
         self.up2 = nn.ConvTranspose3d(
             decoder_channels[0] + encoder_channels[2],
@@ -231,7 +231,9 @@ class TemporalUNetTransformer(nn.Module):
         x4 = self.feature_maps["stage4"]  # (B, C, T, H, W)
 
         # Decoder with Skip Connections
+        print("1", x4.size())
         x = self.up1(x4)
+        print(x.size())
         x = x[:, :, :-1]  # go from T = 26 to T = 25
         x3 = F.interpolate(x3, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
