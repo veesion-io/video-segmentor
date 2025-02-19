@@ -163,7 +163,7 @@ class TemporalUNetTransformer(nn.Module):
             ),
             nn.ReLU(),
             nn.ConvTranspose3d(
-                encoder_output_dim // 8,
+                encoder_output_dim // 16,
                 out_channels,
                 kernel_size=3,
                 stride=2,
