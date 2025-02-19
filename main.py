@@ -201,23 +201,25 @@ def train_model(data_dir, epochs=10, batch_size=4, lr=1e-4):
     model = TemporalUNetTransformer(NUM_CLASSES).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCELoss()
+    with torch.amp.autocast_mode("cuda", dtype=torch.float16):
+        for epoch in range(epochs):
+            model.train()
+            epoch_loss = 0
 
-    for epoch in range(epochs):
-        model.train()
-        epoch_loss = 0
+            for frames, masks in dataloader:
+                frames, masks = frames.to(device), masks.to(device)
 
-        for frames, masks in dataloader:
-            frames, masks = frames.to(device), masks.to(device)
+                optimizer.zero_grad()
+                outputs = model(frames)
+                loss = criterion(outputs, masks)
+                loss.backward()
+                optimizer.step()
 
-            optimizer.zero_grad()
-            outputs = model(frames)
-            loss = criterion(outputs, masks)
-            loss.backward()
-            optimizer.step()
+                epoch_loss += loss.item()
 
-            epoch_loss += loss.item()
-
-        print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss / len(dataloader):.4f}")
+            print(
+                f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss / len(dataloader):.4f}"
+            )
 
     torch.save(model.state_dict(), "temporal_unet_transformer.pth")
     print("Model training complete!")
