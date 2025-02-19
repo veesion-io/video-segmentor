@@ -137,6 +137,12 @@ import torch.nn.functional as F
 import torchvision
 
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
+
+
 class TemporalUNetTransformer(nn.Module):
     def __init__(
         self,
@@ -146,18 +152,22 @@ class TemporalUNetTransformer(nn.Module):
     ):
         super().__init__()
 
-        # Load Swin3D as Encoder Backbone
-        swin3d = torchvision.models.video.swin3d_t(weights="DEFAULT")
-        self.patch_embed = swin3d.patch_embed  # Patch Embedding Layer
-        self.encoder = swin3d.features  # Extract feature layers
-
-        encoder_channels = [96, 192, 384, 768]  # Feature dimensions from Swin3D
-        decoder_channels = [512, 256, 128, 64]  # UNet decoder feature dimensions
+        # Load Swin3D
+        self.swin3d = torchvision.models.video.swin3d_t(weights="DEFAULT")
 
         self.num_frames = num_frames
         self.image_size = image_size
 
+        # Dictionary to store outputs from hooks
+        self.feature_maps = {}
+
+        # Register hooks for feature extraction
+        self._register_hooks()
+
         # Decoder with Skip Connections
+        decoder_channels = [512, 256, 128, 64]
+        encoder_channels = [96, 192, 384, 768]
+
         self.up1 = nn.ConvTranspose3d(
             encoder_channels[-1],
             decoder_channels[0],
@@ -191,59 +201,60 @@ class TemporalUNetTransformer(nn.Module):
             output_padding=1,
         )
 
-        # Final output layer
         self.final_conv = nn.Conv3d(decoder_channels[3], out_channels, kernel_size=1)
 
+    def _register_hooks(self):
+        """
+        Register forward hooks to capture feature maps.
+        """
+
+        def hook_fn(module, input, output, name):
+            self.feature_maps[name] = output
+
+        # Attach hooks to extract feature maps
+        self.swin3d.features[0].register_forward_hook(
+            lambda mod, inp, out: hook_fn(mod, inp, out, "stage1")
+        )
+        self.swin3d.features[2].register_forward_hook(
+            lambda mod, inp, out: hook_fn(mod, inp, out, "stage2")
+        )
+        self.swin3d.features[4].register_forward_hook(
+            lambda mod, inp, out: hook_fn(mod, inp, out, "stage3")
+        )
+        self.swin3d.features[6].register_forward_hook(
+            lambda mod, inp, out: hook_fn(mod, inp, out, "stage4")
+        )
+
     def forward(self, x):
-        print(f"Input shape (Before permute): {x.shape}")  # Debug: Check input shape
+        self.feature_maps = {}  # Reset stored feature maps
+        x = x.permute(0, 2, 1, 3, 4)
+        x = self.swin3d(x)  # Forward pass through Swin3D (hooks will capture features)
 
-        # **Permute Input to (B, T, C, H, W)**
-        x = x.permute(0, 2, 1, 3, 4)  # (B, C, T, H, W) -> (B, T, C, H, W)
-        print(f"Input shape (After permute): {x.shape}")
+        x1 = self.feature_maps["stage1"]  # (B, 96, T', H', W')
+        x2 = self.feature_maps["stage2"]  # (B, 192, T', H', W')
+        x3 = self.feature_maps["stage3"]  # (B, 384, T', H', W')
+        x4 = self.feature_maps["stage4"]  # (B, 768, T', H', W')
 
-        # **Patch Embedding**
-        x = self.patch_embed(x)  # (B, 96, T', H', W')
-        print(f"After patch_embed: {x.shape}")
-
-        # **Extract Encoder Features from Swin3D**
-        x1 = self.encoder[0](x)  # Stage 1 (B, 96, T', H', W')
-        print(f"Stage 1 output: {x1.shape}")
-
-        x2 = self.encoder[1](x1)  # Stage 2 (B, 192, T', H', W')
-        print(f"Stage 2 output: {x2.shape}")
-
-        x3 = self.encoder[2](x2)  # Stage 3 (B, 384, T', H', W')
-        print(f"Stage 3 output: {x3.shape}")
-
-        x4 = self.encoder[3](x3)  # Deepest stage (B, 768, T', H', W')
-        print(f"Stage 4 output (Deepest): {x4.shape}")
-
-        # **Check for Shape Mismatch**
+        # Ensure correct channel sizes
         if x4.shape[1] != 768:
             raise ValueError(f"Expected x4 to have 768 channels, but got {x4.shape}")
 
-        # **Decoder with Skip Connections**
-        x = self.up1(x4)  # (B, 512, T', H', W')
-        print(f"After up1: {x.shape}")
+        # Decoder with Skip Connections
+        x = self.up1(x4)
         x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
 
-        x = self.up2(x)  # (B, 256, T', H', W')
-        print(f"After up2: {x.shape}")
+        x = self.up2(x)
         x = F.interpolate(x, size=x2.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x2], dim=1)  # Skip connection
 
-        x = self.up3(x)  # (B, 128, T', H', W')
-        print(f"After up3: {x.shape}")
+        x = self.up3(x)
         x = F.interpolate(x, size=x1.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
-        x = self.up4(x)  # (B, 64, T', H', W')
-        print(f"After up4: {x.shape}")
+        x = self.up4(x)
 
-        x = self.final_conv(x)  # Final output (B, out_channels, T, H, W)
-        print(f"Final output before interpolation: {x.shape}")
-
+        x = self.final_conv(x)  # Final output
         x = F.interpolate(
             x,
             size=(self.num_frames, self.image_size, self.image_size),
@@ -251,7 +262,6 @@ class TemporalUNetTransformer(nn.Module):
             align_corners=False,
         )
 
-        print(f"Final output shape: {x.shape}")
         return x
 
 
