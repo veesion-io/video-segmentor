@@ -299,7 +299,7 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
         baseline_correct_pixels = 0  # When prediction is always zero
 
         for frames, masks in dataloader:
-            with torch.amp.autocast("cuda", dtype=torch.float16):
+            with torch.amp.autocast("cuda", dtype=torch.float32):
                 frames, masks = frames.to(device), masks.to(device)
 
                 optimizer.zero_grad()
