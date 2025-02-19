@@ -233,18 +233,22 @@ class TemporalUNetTransformer(nn.Module):
         # Decoder with Skip Connections
         x = self.up1(x4)
         x = x[:, :, :-1]  # go from T = 26 to T = 25
+        x = F.leaky_relu(x, 0.2)
         x3 = F.interpolate(x3, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
 
         x = self.up2(x)
+        x = F.leaky_relu(x, 0.2)
         x2 = F.interpolate(x2, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x2], dim=1)  # Skip connection
 
         x = self.up3(x)
+        x = F.leaky_relu(x, 0.2)
         x1 = F.interpolate(x1, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
         x = self.up4(x)
+        x = F.leaky_relu(x, 0.2)
         x = self.final_conv(x)  # Final output
 
         return x
