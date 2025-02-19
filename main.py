@@ -127,7 +127,7 @@ class TemporalUNetTransformer(nn.Module):
 
         # UNet Encoder
         self.encoder = resnext.resnet50()
-        self.encoder.load_state_dict(torch.load("r3d50_KMS_200ep.pth")["state_dict"])
+        # self.encoder.load_state_dict(torch.load("r3d50_KMS_200ep.pth")["state_dict"])
         encoder_output_dim = 2048
         self.num_frames = num_frames
         self.image_size = image_size
