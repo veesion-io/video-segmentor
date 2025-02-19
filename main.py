@@ -7,7 +7,6 @@ import torchvision.transforms as transforms
 import pickle
 import os
 import numpy as np
-import resnext
 
 
 import cv2
@@ -113,6 +112,9 @@ class VideoMaskDataset(Dataset):
         return frames, masks
 
 
+import torchvision
+
+
 # ------------------------------
 # Temporal UNet Transformer Model
 # ------------------------------
@@ -126,8 +128,7 @@ class TemporalUNetTransformer(nn.Module):
         super().__init__()
 
         # UNet Encoder
-        self.encoder = resnext.resnet50()
-        # self.encoder.load_state_dict(torch.load("r3d50_KMS_200ep.pth")["state_dict"])
+        self.encoder = torchvision.models.video.swin3d_t(weights="DEFAULT")
         encoder_output_dim = 2048
         self.num_frames = num_frames
         self.image_size = image_size
