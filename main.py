@@ -135,6 +135,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
+
 
 class TemporalUNetTransformer(nn.Module):
     def __init__(
@@ -197,13 +202,13 @@ class TemporalUNetTransformer(nn.Module):
         # Patch Embedding: Convert RGB input (C=3) into Swin3D-compatible feature maps (C=96)
         x = self.patch_embed(x)  # (B, 96, T', H', W')
 
-        # Encoder
-        x1 = self.encoder[0](x)  # First stage (B, 96, T', H', W')
-        x2 = self.encoder[1](x1)  # Second stage (B, 192, T', H', W')
-        x3 = self.encoder[2](x2)  # Third stage (B, 384, T', H', W')
-        x4 = self.encoder[4](x3)  # Deepest stage (B, 768, T', H', W')
+        # Correctly extract encoder outputs from Swin3D features
+        x1 = self.encoder[0](x)  # Stage 1
+        x2 = self.encoder[2](x1)  # Stage 2
+        x3 = self.encoder[4](x2)  # Stage 3
+        x4 = self.encoder[6](x3)  # Deepest stage
 
-        # Ensure channel consistency
+        # Ensure channel consistency in skip connections
         x4 = F.interpolate(x4, size=x3.shape[2:], mode="trilinear", align_corners=False)
 
         # Decoder with skip connections
