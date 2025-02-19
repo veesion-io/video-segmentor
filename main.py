@@ -127,6 +127,7 @@ class TemporalUNetTransformer(nn.Module):
 
         # UNet Encoder
         self.encoder = resnext.resnet50()
+        self.encoder.load_state_dict(torch.load("r3d50_KMS_200ep.pth"))
         encoder_output_dim = 2048
         self.num_frames = num_frames
         self.image_size = image_size
@@ -200,7 +201,7 @@ def train_model(data_dir, epochs=10, batch_size=4, lr=1e-4):
 
     model = TemporalUNetTransformer(NUM_CLASSES).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogits()
     with torch.amp.autocast("cuda", dtype=torch.float16):
         for epoch in range(epochs):
             model.train()
