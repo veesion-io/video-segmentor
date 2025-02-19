@@ -286,7 +286,10 @@ import time
 
 
 def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
-    writer = SummaryWriter(f"tensorboard_logs/keypoints_and_bags_{int(time.time())}")
+    surname = f"distilled_bag_semgentor_{int(time.time())}"
+    os.makedirs("checkpoints", exist_ok=True)
+    os.makedirs(f"checkpoints/{surname}", exist_ok=True)
+    writer = SummaryWriter(f"tensorboard_logs/{surname}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_dataset = VideoMaskDataset(
@@ -404,9 +407,10 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
             f"Epoch [{epoch + 1}/{epochs}], Train loss: {avg_val_loss:.4f}, "
             f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
         )
-        torch.save(model.state_dict(), "checkpoints/{surname}")
+        torch.save(
+            model.state_dict(), f"checkpoints/{surname}/{surname}_epoch_{epoch}.pth"
+        )
 
-    torch.save(model.state_dict(), "temporal_unet_transformer.pth")
     print("Model training complete!")
 
 
