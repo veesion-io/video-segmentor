@@ -293,7 +293,7 @@ def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-3):
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCEWithLogitsLoss()
 
-    with torch.amp.autocast("cuda", dtype=torch.float16):
+    with torch.amp.autocast("cuda", dtype=torch.float32):
         for epoch in range(epochs):
             model.train()
             epoch_loss = 0
