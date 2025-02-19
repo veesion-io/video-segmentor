@@ -131,11 +131,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-
 
 import torch
 import torch.nn as nn
@@ -209,7 +204,8 @@ class TemporalUNetTransformer(nn.Module):
         """
 
         def hook_fn(module, input, output, name):
-            self.feature_maps[name] = output
+            # Permute to (B, C, T, H, W) before storing
+            self.feature_maps[name] = output.permute(0, 2, 1, 3, 4)
 
         # Attach hooks to extract feature maps
         self.swin3d.features[0].register_forward_hook(
@@ -229,10 +225,17 @@ class TemporalUNetTransformer(nn.Module):
         self.feature_maps = {}  # Reset stored feature maps
         x = self.swin3d(x)  # Forward pass through Swin3D (hooks will capture features)
 
-        x1 = self.feature_maps["stage1"]  # (B, 96, T', H', W')
-        x2 = self.feature_maps["stage2"]  # (B, 192, T', H', W')
-        x3 = self.feature_maps["stage3"]  # (B, 384, T', H', W')
-        x4 = self.feature_maps["stage4"]  # (B, 768, T', H', W')
+        # Extract permuted feature maps
+        x1 = self.feature_maps["stage1"]  # (B, C, T, H, W)
+        x2 = self.feature_maps["stage2"]  # (B, C, T, H, W)
+        x3 = self.feature_maps["stage3"]  # (B, C, T, H, W)
+        x4 = self.feature_maps["stage4"]  # (B, C, T, H, W)
+
+        print(f"x4 shape before decoder: {x4.shape}")  # Debugging
+
+        # Ensure correct channel sizes
+        if x4.shape[1] != 768:
+            raise ValueError(f"Expected x4 to have 768 channels, but got {x4.shape}")
 
         # Decoder with Skip Connections
         x = self.up1(x4)
