@@ -231,12 +231,6 @@ class TemporalUNetTransformer(nn.Module):
         x3 = self.feature_maps["stage3"]  # (B, C, T, H, W)
         x4 = self.feature_maps["stage4"]  # (B, C, T, H, W)
 
-        print(f"x4 shape before decoder: {x4.shape}")  # Debugging
-
-        # Ensure correct channel sizes
-        if x4.shape[1] != 768:
-            raise ValueError(f"Expected x4 to have 768 channels, but got {x4.shape}")
-
         # Decoder with Skip Connections
         x = self.up1(x4)
         x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
@@ -253,6 +247,7 @@ class TemporalUNetTransformer(nn.Module):
         x = self.up4(x)
 
         x = self.final_conv(x)  # Final output
+        print(x.shape, "before final interpoalte")
         x = F.interpolate(
             x,
             size=(self.num_frames, self.image_size, self.image_size),
