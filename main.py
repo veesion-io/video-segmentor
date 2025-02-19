@@ -196,6 +196,20 @@ class TemporalUNetTransformer(nn.Module):
         )
 
         self.final_conv = nn.Conv3d(decoder_channels[3], out_channels, kernel_size=1)
+        # Initialize weights for decoder layers
+        self._init_weights()
+
+    def _init_weights(self):
+        """
+        Initialize only decoder layers using Kaiming He initialization.
+        """
+        for m in self.modules():
+            if isinstance(m, (nn.ConvTranspose3d, nn.Conv3d)):
+                nn.init.kaiming_normal_(
+                    m.weight, mode="fan_out", nonlinearity="leaky_relu"
+                )
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
     def _register_hooks(self):
         """
