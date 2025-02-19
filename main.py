@@ -227,7 +227,6 @@ class TemporalUNetTransformer(nn.Module):
 
     def forward(self, x):
         self.feature_maps = {}  # Reset stored feature maps
-        x = x.permute(0, 2, 1, 3, 4)
         x = self.swin3d(x)  # Forward pass through Swin3D (hooks will capture features)
 
         x1 = self.feature_maps["stage1"]  # (B, 96, T', H', W')
