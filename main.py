@@ -167,7 +167,7 @@ class TemporalUNetTransformer(nn.Module):
             decoder_channels[0],
             kernel_size=(3, 5, 5),
             stride=(2, 4, 4),
-            padding=(1, 4, 4),
+            padding=(1, 2, 2),
             output_padding=(1, 3, 3),
         )
         self.up2 = nn.ConvTranspose3d(
