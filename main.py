@@ -265,10 +265,21 @@ class TemporalUNetTransformer(nn.Module):
 
 def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-4):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = VideoMaskDataset(data_dir, transform=transforms.Normalize(0.5, 0.5))
+    dataset = VideoMaskDataset(
+        data_dir,
+        transform=transforms.Compose(
+            [
+                transforms.ConvertImageDtype(torch.float32),  # Rescale to [0,1]
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),  # ImageNet normalization
+            ]
+        ),
+    )
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 
     model = TemporalUNetTransformer(NUM_CLASSES, num_frames=NUM_FRAMES).to(device)
+    model = torch.compile(model)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCEWithLogitsLoss()
 
@@ -285,7 +296,7 @@ def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-4):
 
                 optimizer.zero_grad()
                 outputs = model(frames)
-
+                print(frames[0][0][0], outputs[0][0][0])
                 loss = criterion(outputs, masks)
                 loss.backward()
                 optimizer.step()
