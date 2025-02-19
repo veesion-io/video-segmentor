@@ -196,7 +196,7 @@ class TemporalUNetTransformer(nn.Module):
 def train_model(data_dir, epochs=10, batch_size=4, lr=1e-4):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoMaskDataset(data_dir, transform=transforms.Normalize(0.5, 0.5))
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 
     model = TemporalUNetTransformer(NUM_CLASSES).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
