@@ -130,9 +130,11 @@ class TemporalUNetTransformer(nn.Module):
 
         # UNet Decoder
         self.decoder = nn.Sequential(
-            nn.ConvTranspose3d(encoder_output_dim, 64, kernel_size=3, padding=1),
+            nn.ConvTranspose3d(
+                encoder_output_dim, 64, kernel_size=3, stride=2, padding=1
+            ),
             nn.ReLU(),
-            nn.ConvTranspose3d(64, out_channels, kernel_size=3, padding=1),
+            nn.ConvTranspose3d(64, out_channels, kernel_size=3, stride=2, padding=1),
             nn.Sigmoid(),
         )
 
