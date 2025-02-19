@@ -130,6 +130,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
 
 
 class TemporalUNetTransformer(nn.Module):
@@ -194,22 +198,22 @@ class TemporalUNetTransformer(nn.Module):
         x = self.patch_embed(x)  # (B, 96, T', H', W')
 
         # Encoder
-        x1 = self.encoder[0](x)  # First stage
-        x2 = self.encoder[1](x1)  # Second stage
-        x3 = self.encoder[2](x2)  # Third stage
-        x4 = self.encoder[4](x3)  # Deepest stage
+        x1 = self.encoder[0](x)  # First stage (B, 96, T', H', W')
+        x2 = self.encoder[1](x1)  # Second stage (B, 192, T', H', W')
+        x3 = self.encoder[2](x2)  # Third stage (B, 384, T', H', W')
+        x4 = self.encoder[4](x3)  # Deepest stage (B, 768, T', H', W')
+
+        # Ensure channel consistency
+        x4 = F.interpolate(x4, size=x3.shape[2:], mode="trilinear", align_corners=False)
 
         # Decoder with skip connections
         x = self.up1(x4)
-        x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)
 
         x = self.up2(x)
-        x = F.interpolate(x, size=x2.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x2], dim=1)
 
         x = self.up3(x)
-        x = F.interpolate(x, size=x1.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x1], dim=1)
 
         x = self.up4(x)
