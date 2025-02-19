@@ -273,7 +273,7 @@ class TemporalUNetTransformer(nn.Module):
 # ------------------------------
 
 
-def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-4):
+def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-3):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoMaskDataset(
         data_dir,
