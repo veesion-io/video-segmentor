@@ -23,6 +23,8 @@ import pickle
 import os
 import torchvision.transforms as transforms
 
+import math
+
 NUM_CLASSES = 13
 TARGET_FPS = 5
 VIDEO_DURATION = 5
@@ -47,6 +49,7 @@ class VideoMaskDataset(Dataset):
         ]
         self.video_path = "/home/veesion/Bag-detector/videos/"
         self.target_fps = target_fps
+        self.duration = duration
         self.num_frames = target_fps * duration
         self.num_classes = num_classes
         self.transform = transform
@@ -73,12 +76,13 @@ class VideoMaskDataset(Dataset):
             raise ValueError(f"Invalid FPS detected in video: {video_name}")
 
         # Compute the exact frame IDs to fetch
-        frame_interval = max(1, int(round(video_fps / self.target_fps)))
+        frame_interval = video_fps / self.target_fps
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        start_frame_id = np.random.choice(int(total_frames - self.duration * video_fps))
         frame_ids = [
-            i * frame_interval
+            start_frame_id + int(round(i * frame_interval))
             for i in range(self.num_frames)
-            if i * frame_interval < total_frames
+            if start_frame_id + i * frame_interval < total_frames
         ]
 
         for t, frame_id in enumerate(frame_ids):  # t is the index in our time dimension
