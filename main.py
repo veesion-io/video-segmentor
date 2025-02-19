@@ -232,27 +232,22 @@ class TemporalUNetTransformer(nn.Module):
         x4 = self.feature_maps["stage4"]  # (B, C, T, H, W)
 
         # Decoder with Skip Connections
-        print("shape before 1st interp, target size", x4.shape)
         x = self.up1(x4)
         x = x[:, :, :-1]  # go from T = 26 to T = 25
-        print(x.shape, "shape before 1st interp, target size", x3.shape)
         x3 = F.interpolate(x3, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
 
         x = self.up2(x)
-        print(x.shape, "shape before 2nd interp, target size", x2.shape)
         x2 = F.interpolate(x2, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x2], dim=1)  # Skip connection
 
         x = self.up3(x)
-        print(x.shape, "shape before 1st interp, target size", x1.shape)
         x1 = F.interpolate(x1, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
         x = self.up4(x)
 
         x = self.final_conv(x)  # Final output
-        print(x.shape, "before final interpoalte")
         x = F.interpolate(
             x,
             size=(self.num_frames, self.image_size, self.image_size),
