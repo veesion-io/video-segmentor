@@ -167,7 +167,7 @@ class TemporalUNetTransformer(nn.Module):
                 out_channels,
                 kernel_size=3,
                 stride=2,
-                padding=(0, 1, 1),
+                padding=(0, 2, 2),
             ),
             nn.Sigmoid(),
         )
