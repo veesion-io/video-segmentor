@@ -143,6 +143,7 @@ class TemporalUNetTransformer(nn.Module):
 
         # Load Swin3D as Encoder Backbone
         swin3d = torchvision.models.video.swin3d_t(weights="DEFAULT")
+        self.patch_embed = swin3d.patch_embed  # Patch Embedding Layer
         self.encoder = swin3d.features  # Extract feature layers
 
         encoder_channels = [96, 192, 384, 768]  # Feature dimensions after each stage
@@ -151,7 +152,7 @@ class TemporalUNetTransformer(nn.Module):
         self.num_frames = num_frames
         self.image_size = image_size
 
-        # Decoder with Skip Connections (Mirrored Structure)
+        # Decoder with Skip Connections
         self.up1 = nn.ConvTranspose3d(
             encoder_channels[-1],
             decoder_channels[0],
@@ -189,11 +190,14 @@ class TemporalUNetTransformer(nn.Module):
         self.final_conv = nn.Conv3d(decoder_channels[3], out_channels, kernel_size=1)
 
     def forward(self, x):
+        # Patch Embedding: Convert RGB input (C=3) into Swin3D-compatible feature maps (C=96)
+        x = self.patch_embed(x)  # (B, 96, T', H', W')
+
         # Encoder
-        x1 = self.encoder[0](x)  # Patch embedding
-        x2 = self.encoder[1](x1)  # First feature block
-        x3 = self.encoder[2](x2)  # Second feature block
-        x4 = self.encoder[4](x3)  # Third feature block (deepest features)
+        x1 = self.encoder[0](x)  # First stage
+        x2 = self.encoder[1](x1)  # Second stage
+        x3 = self.encoder[2](x2)  # Third stage
+        x4 = self.encoder[4](x3)  # Deepest stage
 
         # Decoder with skip connections
         x = self.up1(x4)
