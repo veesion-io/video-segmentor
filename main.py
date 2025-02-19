@@ -281,8 +281,13 @@ class TemporalUNetTransformer(nn.Module):
 # Training Loop
 # ------------------------------
 
+from torch.utils.tensorboard import SummaryWriter
+import time
+
 
 def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
+    writer = SummaryWriter(f"tensorboard_logs/keypoints_and_bags_{int(time.time())}")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_dataset = VideoMaskDataset(
         data_dir,
@@ -356,9 +361,12 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
         baseline_accuracy = (
             baseline_correct_pixels / total_pixels if total_pixels > 0 else 0
         )
+        avg_train_loss = epoch_loss / len(train_dataloader)
+        writer.add_scalar("Loss/Train", avg_train_loss, epoch + 1)
+        writer.add_scalar("Accuracy/Train", pixel_accuracy, epoch + 1)
 
         print(
-            f"Epoch [{epoch + 1}/{epochs}], Train loss: {epoch_loss / len(train_dataloader):.4f}, "
+            f"Epoch [{epoch + 1}/{epochs}], Train loss: {avg_train_loss:.4f}, "
             f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
         )
         model.eval()
@@ -388,9 +396,12 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
         baseline_accuracy = (
             baseline_correct_pixels / total_pixels if total_pixels > 0 else 0
         )
+        avg_val_loss = epoch_loss / len(val_dataloader)
+        writer.add_scalar("Loss/Val", avg_val_loss, epoch + 1)
+        writer.add_scalar("Accuracy/Val", pixel_accuracy, epoch + 1)
 
         print(
-            f"Epoch [{epoch + 1}/{epochs}], Val loss: {epoch_loss / len(val_dataloader):.4f}, "
+            f"Epoch [{epoch + 1}/{epochs}], Train loss: {avg_val_loss:.4f}, "
             f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
         )
 
