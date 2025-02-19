@@ -28,6 +28,7 @@ TARGET_FPS = 5
 VIDEO_DURATION = 5
 IMAGE_SIZE = 224
 NUM_FRAMES = int(VIDEO_DURATION * TARGET_FPS)
+BATCH_SIZE = 2
 
 
 class VideoMaskDataset(Dataset):
@@ -135,33 +136,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-
 
 class TemporalUNetTransformer(nn.Module):
     def __init__(
@@ -221,15 +195,13 @@ class TemporalUNetTransformer(nn.Module):
         self.final_conv = nn.Conv3d(decoder_channels[3], out_channels, kernel_size=1)
 
     def forward(self, x):
-        print(f"Input shape: {x.shape}")  # Debug: Check input shape
+        print(f"Input shape (Before permute): {x.shape}")  # Debug: Check input shape
 
-        # **Ensure Input Has 3 Channels (RGB Video)**
-        if x.shape[1] != 3:
-            raise ValueError(
-                f"Expected input with 3 channels (RGB video), but got {x.shape[1]} channels."
-            )
+        # **Permute Input to (B, T, C, H, W)**
+        x = x.permute(0, 2, 1, 3, 4)  # (B, C, T, H, W) -> (B, T, C, H, W)
+        print(f"Input shape (After permute): {x.shape}")
 
-        # **Apply Patch Embedding**
+        # **Patch Embedding**
         x = self.patch_embed(x)  # (B, 96, T', H', W')
         print(f"After patch_embed: {x.shape}")
 
@@ -288,7 +260,7 @@ class TemporalUNetTransformer(nn.Module):
 # ------------------------------
 
 
-def train_model(data_dir, epochs=10, batch_size=4, lr=1e-4):
+def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-4):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoMaskDataset(data_dir, transform=transforms.Normalize(0.5, 0.5))
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
@@ -348,6 +320,6 @@ if __name__ == "__main__":
     train_model(
         "/home/veesion/Bag-detector/valid_masks_tracks/",
         epochs=20,
-        batch_size=4,
+        batch_size=BATCH_SIZE,
         lr=1e-4,
     )
