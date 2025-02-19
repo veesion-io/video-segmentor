@@ -292,7 +292,7 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
     # model = torch.compile(model)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     pos_weight = torch.tensor(
-        [10.0], device=device
+        [1.0], device=device
     )  # Increase weight for positive pixels
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
