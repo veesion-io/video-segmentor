@@ -177,7 +177,7 @@ class TemporalUNetTransformer(nn.Module):
             kernel_size=3,
             stride=(1, 2, 2),
             padding=1,
-            output_padding=1,
+            output_padding=(0, 1, 1),
         )
         self.up3 = nn.ConvTranspose3d(
             decoder_channels[1] + encoder_channels[1],
@@ -185,7 +185,7 @@ class TemporalUNetTransformer(nn.Module):
             kernel_size=3,
             stride=(1, 2, 2),
             padding=1,
-            output_padding=1,
+            output_padding=(0, 1, 1),
         )
         self.up4 = nn.ConvTranspose3d(
             decoder_channels[2] + encoder_channels[0],
@@ -193,7 +193,7 @@ class TemporalUNetTransformer(nn.Module):
             kernel_size=3,
             stride=(1, 2, 2),
             padding=1,
-            output_padding=1,
+            output_padding=(0, 1, 1),
         )
 
         self.final_conv = nn.Conv3d(decoder_channels[3], out_channels, kernel_size=1)
