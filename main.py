@@ -133,7 +133,7 @@ class TemporalUNetTransformer(nn.Module):
             nn.ConvTranspose3d(
                 encoder_output_dim,
                 encoder_output_dim // 2,
-                kernel_size=3,
+                kernel_size=(3, 5, 5),
                 stride=2,
                 padding=1,
             ),
@@ -141,7 +141,7 @@ class TemporalUNetTransformer(nn.Module):
             nn.ConvTranspose3d(
                 encoder_output_dim // 2,
                 encoder_output_dim // 4,
-                kernel_size=3,
+                kernel_size=(3, 5, 5),
                 stride=2,
                 padding=1,
             ),
@@ -149,7 +149,7 @@ class TemporalUNetTransformer(nn.Module):
             nn.ConvTranspose3d(
                 encoder_output_dim // 4,
                 encoder_output_dim // 8,
-                kernel_size=5,
+                kernel_size=(3, 5, 5),
                 stride=2,
                 padding=1,
             ),
@@ -157,7 +157,7 @@ class TemporalUNetTransformer(nn.Module):
             nn.ConvTranspose3d(
                 encoder_output_dim // 8,
                 encoder_output_dim // 16,
-                kernel_size=5,
+                kernel_size=(3, 5, 5),
                 stride=(1, 2, 2),
                 padding=1,
             ),
