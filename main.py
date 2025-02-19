@@ -404,6 +404,7 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
             f"Epoch [{epoch + 1}/{epochs}], Train loss: {avg_val_loss:.4f}, "
             f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
         )
+        torch.save(model.state_dict(), "checkpoints/{surname}")
 
     torch.save(model.state_dict(), "temporal_unet_transformer.pth")
     print("Model training complete!")
