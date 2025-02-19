@@ -311,7 +311,7 @@ def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-3):
                 optimizer.step()
 
                 epoch_loss += loss.item()
-
+                print(outputs[0, :, 13, 112, 112])
                 # Compute pixel-wise accuracy
                 predicted = (
                     outputs > 0
