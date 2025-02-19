@@ -151,6 +151,12 @@ import torch.nn.functional as F
 import torchvision
 
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
+
+
 class TemporalUNetTransformer(nn.Module):
     def __init__(
         self,
@@ -209,34 +215,51 @@ class TemporalUNetTransformer(nn.Module):
         self.final_conv = nn.Conv3d(decoder_channels[3], out_channels, kernel_size=1)
 
     def forward(self, x):
-        # Ensure input has correct shape [B, 3, T, H, W] (RGB Video)
-        if x.shape[1] != 3:
-            raise ValueError(
-                f"Expected input with 3 channels (RGB video), but got {x.shape[1]} channels."
-            )
+        print(f"Input shape: {x.shape}")  # Debug: Check input shape
 
         # Patch Embedding: Convert RGB input (C=3) into Swin3D-compatible feature maps (C=96)
         x = self.patch_embed(x)  # (B, 96, T', H', W')
+        print(f"After patch_embed: {x.shape}")
 
         # Correctly extract encoder outputs from Swin3D features
         x1 = self.encoder[0](x)  # Stage 1 (B, 96, T', H', W')
+        print(f"Stage 1 output: {x1.shape}")
+
         x2 = self.encoder[1](x1)  # Stage 2 (B, 192, T', H', W')
+        print(f"Stage 2 output: {x2.shape}")
+
         x3 = self.encoder[2](x2)  # Stage 3 (B, 384, T', H', W')
+        print(f"Stage 3 output: {x3.shape}")
+
         x4 = self.encoder[3](x3)  # Deepest stage (B, 768, T', H', W')
+        print(f"Stage 4 output (Deepest): {x4.shape}")
 
         # Ensure correct channel size before decoding
-        x = self.up1(x4)
-        x = torch.cat([x, x3], dim=1)
+        if x4.shape[1] != 768:
+            raise ValueError(f"Expected x4 to have 768 channels, but got {x4.shape}")
 
-        x = self.up2(x)
-        x = torch.cat([x, x2], dim=1)
+        # Decoder with skip connections
+        x = self.up1(x4)  # (B, 512, T', H', W')
+        print(f"After up1: {x.shape}")
+        x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
+        x = torch.cat([x, x3], dim=1)  # Skip connection
 
-        x = self.up3(x)
-        x = torch.cat([x, x1], dim=1)
+        x = self.up2(x)  # (B, 256, T', H', W')
+        print(f"After up2: {x.shape}")
+        x = F.interpolate(x, size=x2.shape[2:], mode="trilinear", align_corners=False)
+        x = torch.cat([x, x2], dim=1)  # Skip connection
 
-        x = self.up4(x)
+        x = self.up3(x)  # (B, 128, T', H', W')
+        print(f"After up3: {x.shape}")
+        x = F.interpolate(x, size=x1.shape[2:], mode="trilinear", align_corners=False)
+        x = torch.cat([x, x1], dim=1)  # Skip connection
 
-        x = self.final_conv(x)  # Final output
+        x = self.up4(x)  # (B, 64, T', H', W')
+        print(f"After up4: {x.shape}")
+
+        x = self.final_conv(x)  # Final output (B, out_channels, T, H, W)
+        print(f"Final output before interpolation: {x.shape}")
+
         x = F.interpolate(
             x,
             size=(self.num_frames, self.image_size, self.image_size),
@@ -244,6 +267,7 @@ class TemporalUNetTransformer(nn.Module):
             align_corners=False,
         )
 
+        print(f"Final output shape: {x.shape}")
         return x
 
 
