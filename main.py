@@ -28,7 +28,7 @@ TARGET_FPS = 5
 VIDEO_DURATION = 5
 IMAGE_SIZE = 224
 NUM_FRAMES = int(VIDEO_DURATION * TARGET_FPS)
-BATCH_SIZE = 2
+BATCH_SIZE = 8
 
 
 class VideoMaskDataset(Dataset):
@@ -126,11 +126,6 @@ import torchvision
 # ------------------------------
 # Temporal UNet Transformer Model
 # ------------------------------
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
