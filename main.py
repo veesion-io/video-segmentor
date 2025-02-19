@@ -137,7 +137,7 @@ class TemporalUNetTransformer(nn.Module):
 
         # UNet Encoder (Swin3D)
         self.encoder = torchvision.models.video.swin3d_t(weights="DEFAULT")
-        encoder_output_dim = 2048  # Feature dimension from Swin3D
+        encoder_output_dim = 768  # Feature dimension from Swin3D
         self.num_frames = num_frames
         self.image_size = image_size
 
