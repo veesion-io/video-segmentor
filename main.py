@@ -293,15 +293,15 @@ def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-3):
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCEWithLogitsLoss()
 
-    with torch.amp.autocast("cuda", dtype=torch.float32):
-        for epoch in range(epochs):
-            model.train()
-            epoch_loss = 0
-            correct_pixels = 0
-            total_pixels = 0
-            baseline_correct_pixels = 0  # When prediction is always zero
+    for epoch in range(epochs):
+        model.train()
+        epoch_loss = 0
+        correct_pixels = 0
+        total_pixels = 0
+        baseline_correct_pixels = 0  # When prediction is always zero
 
-            for frames, masks in dataloader:
+        for frames, masks in dataloader:
+            with torch.amp.autocast("cuda", dtype=torch.float32):
                 frames, masks = frames.to(device), masks.to(device)
 
                 optimizer.zero_grad()
@@ -310,27 +310,25 @@ def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-3):
                 loss.backward()
                 optimizer.step()
 
-                epoch_loss += loss.item()
-                print(outputs[0, :, 13, 112, 112], masks[0, :, 13, 112, 112])
-                # Compute pixel-wise accuracy
-                predicted = (
-                    outputs > 0
-                ).float()  # Convert logits to binary predictions
-                correct_pixels += (predicted == masks).sum().item()
-                total_pixels += masks.numel()
+            epoch_loss += loss.item()
+            print(outputs[0, :, 13, 112, 112], masks[0, :, 13, 112, 112])
+            # Compute pixel-wise accuracy
+            predicted = (outputs > 0).float()  # Convert logits to binary predictions
+            correct_pixels += (predicted == masks).sum().item()
+            total_pixels += masks.numel()
 
-                # Baseline accuracy (assume all predictions are 0)
-                baseline_correct_pixels += (masks == 0).sum().item()
+            # Baseline accuracy (assume all predictions are 0)
+            baseline_correct_pixels += (masks == 0).sum().item()
 
-            pixel_accuracy = correct_pixels / total_pixels if total_pixels > 0 else 0
-            baseline_accuracy = (
-                baseline_correct_pixels / total_pixels if total_pixels > 0 else 0
-            )
+        pixel_accuracy = correct_pixels / total_pixels if total_pixels > 0 else 0
+        baseline_accuracy = (
+            baseline_correct_pixels / total_pixels if total_pixels > 0 else 0
+        )
 
-            print(
-                f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss / len(dataloader):.4f}, "
-                f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
-            )
+        print(
+            f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss / len(dataloader):.4f}, "
+            f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
+        )
 
     torch.save(model.state_dict(), "temporal_unet_transformer.pth")
     print("Model training complete!")
