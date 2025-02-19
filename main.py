@@ -157,6 +157,12 @@ import torch.nn.functional as F
 import torchvision
 
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
+
+
 class TemporalUNetTransformer(nn.Module):
     def __init__(
         self,
@@ -217,11 +223,17 @@ class TemporalUNetTransformer(nn.Module):
     def forward(self, x):
         print(f"Input shape: {x.shape}")  # Debug: Check input shape
 
-        # Patch Embedding: Convert RGB input (C=3) into Swin3D-compatible feature maps (C=96)
+        # **Ensure Input Has 3 Channels (RGB Video)**
+        if x.shape[1] != 3:
+            raise ValueError(
+                f"Expected input with 3 channels (RGB video), but got {x.shape[1]} channels."
+            )
+
+        # **Apply Patch Embedding**
         x = self.patch_embed(x)  # (B, 96, T', H', W')
         print(f"After patch_embed: {x.shape}")
 
-        # Correctly extract encoder outputs from Swin3D features
+        # **Extract Encoder Features from Swin3D**
         x1 = self.encoder[0](x)  # Stage 1 (B, 96, T', H', W')
         print(f"Stage 1 output: {x1.shape}")
 
@@ -234,11 +246,11 @@ class TemporalUNetTransformer(nn.Module):
         x4 = self.encoder[3](x3)  # Deepest stage (B, 768, T', H', W')
         print(f"Stage 4 output (Deepest): {x4.shape}")
 
-        # Ensure correct channel size before decoding
+        # **Check for Shape Mismatch**
         if x4.shape[1] != 768:
             raise ValueError(f"Expected x4 to have 768 channels, but got {x4.shape}")
 
-        # Decoder with skip connections
+        # **Decoder with Skip Connections**
         x = self.up1(x4)  # (B, 512, T', H', W')
         print(f"After up1: {x.shape}")
         x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
