@@ -24,10 +24,17 @@ import pickle
 import os
 import torchvision.transforms as transforms
 
+NUM_CLASSES = 13
+
 
 class VideoMaskDataset(Dataset):
     def __init__(
-        self, data_dir, target_fps=10, duration=5, num_classes=13, transform=None
+        self,
+        data_dir,
+        target_fps=10,
+        duration=5,
+        num_classes=NUM_CLASSES,
+        transform=None,
     ):
         self.data_files = [
             os.path.join(data_dir, f)
@@ -112,7 +119,6 @@ class TemporalUNetTransformer(nn.Module):
         self,
         out_channels=1,
         num_frames=16,
-        embed_dim=128,
         num_heads=4,
         depth=2,
     ):
@@ -120,10 +126,11 @@ class TemporalUNetTransformer(nn.Module):
 
         # UNet Encoder
         self.encoder = resnext.resnet50()
+        encoder_output_dim = 2048
 
         # UNet Decoder
         self.decoder = nn.Sequential(
-            nn.ConvTranspose3d(embed_dim, 64, kernel_size=3, padding=1),
+            nn.ConvTranspose3d(encoder_output_dim, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.ConvTranspose3d(64, out_channels, kernel_size=3, padding=1),
             nn.Sigmoid(),
@@ -146,7 +153,7 @@ def train_model(data_dir, epochs=10, batch_size=4, lr=1e-4):
     dataset = VideoMaskDataset(data_dir, transform=transforms.Normalize(0.5, 0.5))
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    model = TemporalUNetTransformer().to(device)
+    model = TemporalUNetTransformer(NUM_CLASSES).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCELoss()
 
