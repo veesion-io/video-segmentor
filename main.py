@@ -291,7 +291,10 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-3):
     model = TemporalUNetTransformer(NUM_CLASSES, num_frames=NUM_FRAMES).to(device)
     # model = torch.compile(model)
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.BCEWithLogitsLoss()
+    pos_weight = torch.tensor(
+        [500.0], device=device
+    )  # Increase weight for positive pixels
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     for epoch in range(epochs):
         model.train()
