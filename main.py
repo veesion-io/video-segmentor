@@ -118,15 +118,16 @@ class TemporalUNetTransformer(nn.Module):
     def __init__(
         self,
         out_channels=1,
-        num_frames=16,
-        num_heads=4,
-        depth=2,
+        num_frames=50,
+        image_size=256,
     ):
         super().__init__()
 
         # UNet Encoder
         self.encoder = resnext.resnet50()
         encoder_output_dim = 2048
+        self.num_frames = num_frames
+        self.image_size = image_size
 
         # UNet Decoder
         self.decoder = nn.Sequential(
@@ -157,9 +158,9 @@ class TemporalUNetTransformer(nn.Module):
             nn.ConvTranspose3d(
                 encoder_output_dim // 8,
                 encoder_output_dim // 16,
-                kernel_size=(3, 3, 3),
+                kernel_size=(3, 5, 5),
                 stride=(1, 2, 2),
-                padding=(1, 1, 1),
+                padding=(1, 0, 0),
             ),
             nn.ReLU(),
             nn.ConvTranspose3d(
@@ -167,7 +168,7 @@ class TemporalUNetTransformer(nn.Module):
                 out_channels,
                 kernel_size=3,
                 stride=2,
-                padding=(0, 2, 2),
+                padding=(0, 1, 1),
             ),
             nn.Sigmoid(),
         )
@@ -176,6 +177,12 @@ class TemporalUNetTransformer(nn.Module):
         x = self.encoder(x)  # (B, C, T, H, W)
 
         x = self.decoder(x)  # (B, 1, T, H, W)
+        x = F.interpolate(
+            x,
+            size=(self.num_frames, self.image_size, self.image_size),
+            mode="trilinear",
+            align_corners=False,
+        )
         return x
 
 
