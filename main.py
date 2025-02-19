@@ -245,7 +245,7 @@ class TemporalUNetTransformer(nn.Module):
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
         x = self.up4(x)
-
+        print(x.size())
         x = self.final_conv(x)  # Final output
         x = F.interpolate(
             x,
