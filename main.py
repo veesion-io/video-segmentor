@@ -205,7 +205,7 @@ class TemporalUNetTransformer(nn.Module):
 
         def hook_fn(module, input, output, name):
             # Permute to (B, C, T, H, W) before storing
-            self.feature_maps[name] = output.permute(0, 2, 1, 3, 4)
+            self.feature_maps[name] = output.permute(0, 4, 1, 2, 3)
 
         # Attach hooks to extract feature maps
         self.swin3d.features[0].register_forward_hook(
