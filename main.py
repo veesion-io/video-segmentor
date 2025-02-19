@@ -110,13 +110,12 @@ class VideoMaskDataset(Dataset):
         cap.release()
 
         frames = torch.stack(frames)  # (T, C, H, W)
+        if self.transform:
+            frames = self.transform(frames)
         frames = frames.permute(1, 0, 2, 3)  # (C, T, H, W)
         masks = (
             torch.tensor(masks, dtype=torch.float32) / 255.0
         )  # (num_classes, T, H, W)
-
-        if self.transform:
-            frames = self.transform(frames)
 
         return frames, masks
 
