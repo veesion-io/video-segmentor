@@ -295,7 +295,6 @@ def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-4):
 
                 optimizer.zero_grad()
                 outputs = model(frames)
-                print(frames[0][0][0], outputs[0][0][0])
                 loss = criterion(outputs, masks)
                 loss.backward()
                 optimizer.step()
