@@ -126,6 +126,12 @@ import torchvision
 # ------------------------------
 # Temporal UNet Transformer Model
 # ------------------------------
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
+
+
 class TemporalUNetTransformer(nn.Module):
     def __init__(
         self,
@@ -135,98 +141,76 @@ class TemporalUNetTransformer(nn.Module):
     ):
         super().__init__()
 
-        # UNet Encoder (Swin3D)
-        self.encoder = torchvision.models.video.swin3d_t(weights="DEFAULT")
-        encoder_output_dim = 768  # Feature dimension from Swin3D
+        # Load Swin3D as Encoder Backbone
+        swin3d = torchvision.models.video.swin3d_t(weights="DEFAULT")
+        self.encoder = swin3d.features  # Extract feature layers
+
+        encoder_channels = [96, 192, 384, 768]  # Feature dimensions after each stage
+        decoder_channels = [512, 256, 128, 64]  # UNet decoder feature dimensions
+
         self.num_frames = num_frames
         self.image_size = image_size
 
-        # Intermediate feature maps for skip connections
-        self.enc1 = nn.Sequential(*list(self.encoder.children())[:2])  # Initial layers
-        self.enc2 = nn.Sequential(*list(self.encoder.children())[2:4])  # Mid layers
-        self.enc3 = nn.Sequential(*list(self.encoder.children())[4:])  # Deep features
-
-        # Bottleneck
-        self.bottleneck = nn.Conv3d(
-            encoder_output_dim, encoder_output_dim, kernel_size=3, padding=1
+        # Decoder with Skip Connections (Mirrored Structure)
+        self.up1 = nn.ConvTranspose3d(
+            encoder_channels[-1],
+            decoder_channels[0],
+            kernel_size=3,
+            stride=2,
+            padding=1,
+            output_padding=1,
         )
-
-        # Decoder with Skip Connections
-        self.dec1 = nn.Sequential(
-            nn.ConvTranspose3d(
-                encoder_output_dim,
-                encoder_output_dim // 2,
-                kernel_size=3,
-                stride=2,
-                padding=1,
-                output_padding=1,
-            ),
-            nn.ReLU(),
+        self.up2 = nn.ConvTranspose3d(
+            decoder_channels[0] + encoder_channels[2],
+            decoder_channels[1],
+            kernel_size=3,
+            stride=2,
+            padding=1,
+            output_padding=1,
         )
-
-        self.dec2 = nn.Sequential(
-            nn.ConvTranspose3d(
-                encoder_output_dim // 2,
-                encoder_output_dim // 4,
-                kernel_size=3,
-                stride=2,
-                padding=1,
-                output_padding=1,
-            ),
-            nn.ReLU(),
+        self.up3 = nn.ConvTranspose3d(
+            decoder_channels[1] + encoder_channels[1],
+            decoder_channels[2],
+            kernel_size=3,
+            stride=2,
+            padding=1,
+            output_padding=1,
         )
-
-        self.dec3 = nn.Sequential(
-            nn.ConvTranspose3d(
-                encoder_output_dim // 4,
-                encoder_output_dim // 8,
-                kernel_size=3,
-                stride=2,
-                padding=1,
-                output_padding=1,
-            ),
-            nn.ReLU(),
-        )
-
-        self.dec4 = nn.Sequential(
-            nn.ConvTranspose3d(
-                encoder_output_dim // 8,
-                encoder_output_dim // 16,
-                kernel_size=3,
-                stride=2,
-                padding=1,
-                output_padding=1,
-            ),
-            nn.ReLU(),
+        self.up4 = nn.ConvTranspose3d(
+            decoder_channels[2] + encoder_channels[0],
+            decoder_channels[3],
+            kernel_size=3,
+            stride=2,
+            padding=1,
+            output_padding=1,
         )
 
         # Final output layer
-        self.final_conv = nn.Conv3d(
-            encoder_output_dim // 16, out_channels, kernel_size=1
-        )
+        self.final_conv = nn.Conv3d(decoder_channels[3], out_channels, kernel_size=1)
 
     def forward(self, x):
-        # Encoder (Extract Features)
-        x1 = self.enc1(x)  # Shallow
-        x2 = self.enc2(x1)  # Mid-level
-        x3 = self.enc3(x2)  # Deep
+        # Encoder
+        x1 = self.encoder[0](x)  # Patch embedding
+        x2 = self.encoder[1](x1)  # First feature block
+        x3 = self.encoder[2](x2)  # Second feature block
+        x4 = self.encoder[4](x3)  # Third feature block (deepest features)
 
-        # Bottleneck
-        x_bottleneck = self.bottleneck(x3)
+        # Decoder with skip connections
+        x = self.up1(x4)
+        x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
+        x = torch.cat([x, x3], dim=1)
 
-        # Decoder with Skip Connections
-        x = self.dec1(x_bottleneck)  # Upsample
+        x = self.up2(x)
         x = F.interpolate(x, size=x2.shape[2:], mode="trilinear", align_corners=False)
-        x = torch.cat([x, x2], dim=1)  # Skip connection
+        x = torch.cat([x, x2], dim=1)
 
-        x = self.dec2(x)
+        x = self.up3(x)
         x = F.interpolate(x, size=x1.shape[2:], mode="trilinear", align_corners=False)
-        x = torch.cat([x, x1], dim=1)  # Skip connection
+        x = torch.cat([x, x1], dim=1)
 
-        x = self.dec3(x)
-        x = self.dec4(x)
+        x = self.up4(x)
 
-        x = self.final_conv(x)  # Final prediction
+        x = self.final_conv(x)  # Final output
         x = F.interpolate(
             x,
             size=(self.num_frames, self.image_size, self.image_size),
