@@ -278,7 +278,7 @@ def train_model(data_dir, epochs=10, batch_size=BATCH_SIZE, lr=1e-4):
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 
     model = TemporalUNetTransformer(NUM_CLASSES, num_frames=NUM_FRAMES).to(device)
-    model = torch.compile(model)
+    # model = torch.compile(model)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCEWithLogitsLoss()
 
