@@ -309,7 +309,7 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
                 optimizer.step()
 
             epoch_loss += loss.item()
-            print(outputs[0, :, 13, 112, 112], masks[0, :, 13, 112, 112])
+            print(outputs[0, :, 13, 112, 112])
             # Compute pixel-wise accuracy
             predicted = (outputs > 0).float()  # Convert logits to binary predictions
             correct_pixels += (predicted == masks).sum().item()
