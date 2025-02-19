@@ -24,14 +24,18 @@ import os
 import torchvision.transforms as transforms
 
 NUM_CLASSES = 13
+TARGET_FPS = 5
+VIDEO_DURATION = 5
+IMAGE_SIZE = 224
+NUM_FRAMES = int(VIDEO_DURATION * TARGET_FPS)
 
 
 class VideoMaskDataset(Dataset):
     def __init__(
         self,
         data_dir,
-        target_fps=10,
-        duration=5,
+        target_fps=TARGET_FPS,
+        duration=VIDEO_DURATION,
         num_classes=NUM_CLASSES,
         transform=None,
     ):
@@ -56,7 +60,7 @@ class VideoMaskDataset(Dataset):
 
         frames = []
         masks = np.zeros(
-            (self.num_classes, self.num_frames, 256, 256), dtype=np.uint8
+            (self.num_classes, self.num_frames, IMAGE_SIZE, IMAGE_SIZE), dtype=np.uint8
         )  # (C, T, H, W)
 
         video_name = os.path.basename(pkl_file).replace(".pkl", ".mp4")
@@ -80,9 +84,13 @@ class VideoMaskDataset(Dataset):
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
             ret, frame = cap.read()
             if ret:
-                frame_data = transforms.ToTensor()(cv2.resize(frame, (256, 256)))
+                frame_data = transforms.ToTensor()(
+                    cv2.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
+                )
             else:
-                frame_data = torch.zeros((3, 256, 256))  # Placeholder if frame missing
+                frame_data = torch.zeros(
+                    (3, IMAGE_SIZE, IMAGE_SIZE)
+                )  # Placeholder if frame missing
 
             frames.append(frame_data)
 
@@ -123,7 +131,7 @@ class TemporalUNetTransformer(nn.Module):
         self,
         out_channels=1,
         num_frames=50,
-        image_size=256,
+        image_size=IMAGE_SIZE,
     ):
         super().__init__()
 
@@ -200,7 +208,7 @@ def train_model(data_dir, epochs=10, batch_size=4, lr=1e-4):
     dataset = VideoMaskDataset(data_dir, transform=transforms.Normalize(0.5, 0.5))
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 
-    model = TemporalUNetTransformer(NUM_CLASSES).to(device)
+    model = TemporalUNetTransformer(NUM_CLASSES, num_frames=NUM_FRAMES).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCEWithLogitsLoss()
 
