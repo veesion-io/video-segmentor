@@ -233,17 +233,17 @@ class TemporalUNetTransformer(nn.Module):
 
         # Decoder with Skip Connections
         x = self.up1(x4)
-        print(x.shape, "before 1st", x3.shape[2:])
+        print(x.shape, "shape before 1st interp, target size", x3.shape)
         x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
 
         x = self.up2(x)
-        print(x.shape, "before 2nd", x2.shape[2:])
+        print(x.shape, "shape before 2nd interp, target size", x2.shape)
         x = F.interpolate(x, size=x2.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x2], dim=1)  # Skip connection
 
         x = self.up3(x)
-        print(x.shape, "before 3rd", x1.shape[2:])
+        print(x.shape, "shape before 1st interp, target size", x1.shape)
         x = F.interpolate(x, size=x1.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
