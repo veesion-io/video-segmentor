@@ -175,7 +175,7 @@ class TemporalUNetTransformer(nn.Module):
             decoder_channels[0] + encoder_channels[2],
             decoder_channels[1],
             kernel_size=3,
-            stride=2,
+            stride=(1, 2, 2),
             padding=1,
             output_padding=1,
         )
@@ -183,7 +183,7 @@ class TemporalUNetTransformer(nn.Module):
             decoder_channels[1] + encoder_channels[1],
             decoder_channels[2],
             kernel_size=3,
-            stride=2,
+            stride=(1, 2, 2),
             padding=1,
             output_padding=1,
         )
@@ -191,7 +191,7 @@ class TemporalUNetTransformer(nn.Module):
             decoder_channels[2] + encoder_channels[0],
             decoder_channels[3],
             kernel_size=3,
-            stride=2,
+            stride=(1, 2, 2),
             padding=1,
             output_padding=1,
         )
@@ -235,17 +235,17 @@ class TemporalUNetTransformer(nn.Module):
         print("shape before 1st interp, target size", x4.shape)
         x = self.up1(x4)
         print(x.shape, "shape before 1st interp, target size", x3.shape)
-        x = F.interpolate(x, size=x3.shape[2:], mode="trilinear", align_corners=False)
+        x3 = F.interpolate(x3, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x3], dim=1)  # Skip connection
 
         x = self.up2(x)
         print(x.shape, "shape before 2nd interp, target size", x2.shape)
-        x = F.interpolate(x, size=x2.shape[2:], mode="trilinear", align_corners=False)
+        x2 = F.interpolate(x2, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x2], dim=1)  # Skip connection
 
         x = self.up3(x)
         print(x.shape, "shape before 1st interp, target size", x1.shape)
-        x = F.interpolate(x, size=x1.shape[2:], mode="trilinear", align_corners=False)
+        x1 = F.interpolate(x1, size=x.shape[2:], mode="trilinear", align_corners=False)
         x = torch.cat([x, x1], dim=1)  # Skip connection
 
         x = self.up4(x)
