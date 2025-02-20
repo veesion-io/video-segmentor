@@ -5,6 +5,7 @@ import numpy as np
 import os
 import glob
 import argparse
+import pickle
 from model import TemporalUNetTransformer  # Ensure your model class is in model.py
 
 NUM_CLASSES = 13
@@ -12,23 +13,22 @@ TARGET_FPS = 5
 VIDEO_DURATION = 5
 IMAGE_SIZE = 224
 NUM_FRAMES = int(VIDEO_DURATION * TARGET_FPS)
-BATCH_SIZE = 4
 
 # Color map for 13 classes
 COLORS = [
-    (255, 0, 0),  # Class 0 - Blue
-    (0, 255, 0),  # Class 1 - Green
-    (0, 0, 255),  # Class 2 - Red
-    (255, 255, 0),  # Class 3 - Cyan
-    (255, 0, 255),  # Class 4 - Magenta
-    (0, 255, 255),  # Class 5 - Yellow
-    (128, 0, 0),  # Class 6 - Dark Blue
-    (0, 128, 0),  # Class 7 - Dark Green
-    (0, 0, 128),  # Class 8 - Dark Red
-    (128, 128, 0),  # Class 9 - Olive
-    (128, 0, 128),  # Class 10 - Purple
-    (0, 128, 128),  # Class 11 - Teal
-    (128, 128, 128),  # Class 12 - Gray
+    (255, 0, 0),
+    (0, 255, 0),
+    (0, 0, 255),
+    (255, 255, 0),
+    (255, 0, 255),
+    (0, 255, 255),
+    (128, 0, 0),
+    (0, 128, 0),
+    (0, 0, 128),
+    (128, 128, 0),
+    (128, 0, 128),
+    (0, 128, 128),
+    (128, 128, 128),
 ]
 
 
@@ -47,6 +47,33 @@ def load_model(checkpoint_path):
     return model.eval()
 
 
+def extract_ground_truth_masks(pkl_path):
+    """
+    Extract ground truth masks from the .pkl file.
+    Returns: (T, H, W, 3) numpy array with GT masks overlaid.
+    """
+    with open(pkl_path, "rb") as f:
+        data = pickle.load(f)
+
+    masks = np.zeros(
+        (NUM_FRAMES, IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8
+    )  # (T, H, W, 3)
+
+    for track_id in data["tracks"]:
+        for frame_id, (_, contours) in data["tracks"][track_id].items():
+            class_id = data["classes"][track_id]
+            if 0 <= class_id < NUM_CLASSES:
+                cv2.drawContours(
+                    masks[frame_id],
+                    contours,
+                    -1,
+                    COLORS[class_id],
+                    thickness=cv2.FILLED,
+                )
+
+    return masks
+
+
 def process_video(video_path, model):
     """
     Process the input video and predict segmentation masks using a fixed window duration and target FPS.
@@ -62,9 +89,8 @@ def process_video(video_path, model):
         cap.release()
         raise ValueError(f"Invalid FPS detected in video: {video_path}")
 
-    # Compute exact frame selection to maintain alignment
     frame_interval = video_fps / TARGET_FPS
-    start_frame_id = 0  # Start from the beginning
+    start_frame_id = 0
     frame_ids = [
         start_frame_id + int(round(i * frame_interval))
         for i in range(NUM_FRAMES)
@@ -74,9 +100,7 @@ def process_video(video_path, model):
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Resize(
-                (IMAGE_SIZE, IMAGE_SIZE)
-            ),  # Keep original frames untouched
+            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
             transforms.ConvertImageDtype(torch.float32),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
@@ -95,7 +119,6 @@ def process_video(video_path, model):
 
     cap.release()
 
-    # Ensure we have exactly NUM_FRAMES (pad with black frames if needed)
     while len(frames) < NUM_FRAMES:
         frames.append(torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE)))
 
@@ -104,25 +127,27 @@ def process_video(video_path, model):
     )  # (1, C, T, H, W)
 
     with torch.no_grad():
-        output_masks = torch.sigmoid(model(frames))
-        binary_masks = (output_masks > 0.5).float()
+        output_masks = torch.sigmoid(model(frames))  # Get probability maps
+        binary_masks = (output_masks > 0.5).float()  # Convert to binary masks
 
     return binary_masks.cpu().numpy(), frame_ids
 
 
-def save_masks_as_video(
-    video_path, masks, frame_ids, output_path, fps=TARGET_FPS, alpha=0.5
+def save_comparison_video(
+    video_path, masks, frame_ids, gt_masks, output_path, fps=TARGET_FPS, alpha=0.5
 ):
     """
-    Save the original video with segmentation masks overlaid correctly.
-    Reads frames explicitly using frame_ids to ensure proper alignment.
+    Save a side-by-side comparison video with:
+    - Left side: Original frames with **Predicted Segmentation**
+    - Right side: Original frames with **Ground Truth Segmentation**
     """
     cap = cv2.VideoCapture(video_path)
     original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    combined_width = original_width * 2  # Double the width to fit side-by-side
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, (original_width, original_height))
+    out = cv2.VideoWriter(output_path, fourcc, fps, (combined_width, original_height))
 
     for t, frame_id in enumerate(frame_ids):
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
@@ -130,40 +155,51 @@ def save_masks_as_video(
         if not ret:
             break
 
-        mask_frame = np.zeros_like(frame, dtype=np.uint8)  # Blank mask
+        mask_frame_pred = np.zeros_like(frame, dtype=np.uint8)  # Blank mask
         for class_id in range(NUM_CLASSES):
             mask = masks[0, class_id, t]  # (H, W)
             color = np.array(COLORS[class_id], dtype=np.uint8)
 
-            # Resize mask to match the original frame size
             resized_mask = cv2.resize(
                 mask, (original_width, original_height), interpolation=cv2.INTER_NEAREST
             )
-
-            # Apply mask only on detected areas
             mask_indices = resized_mask > 0
-            mask_frame[mask_indices] = color  # Colorize detected areas
+            mask_frame_pred[mask_indices] = color  # Apply color mask
 
-        # Blend only the mask regions onto the original frame
-        blended_frame = frame.copy()
-        mask_indices = mask_frame.sum(axis=2) > 0  # Detect where masks exist
-        blended_frame[mask_indices] = (
-            (1 - alpha) * frame[mask_indices] + alpha * mask_frame[mask_indices]
+        blended_pred = frame.copy()
+        mask_indices = mask_frame_pred.sum(axis=2) > 0
+        blended_pred[mask_indices] = (
+            (1 - alpha) * frame[mask_indices] + alpha * mask_frame_pred[mask_indices]
         ).astype(np.uint8)
 
-        out.write(blended_frame)
+        # Ground truth overlay
+        gt_mask_resized = cv2.resize(
+            gt_masks[t],
+            (original_width, original_height),
+            interpolation=cv2.INTER_NEAREST,
+        )
+        blended_gt = frame.copy()
+        mask_indices_gt = gt_mask_resized.sum(axis=2) > 0
+        blended_gt[mask_indices_gt] = (
+            (1 - alpha) * frame[mask_indices_gt]
+            + alpha * gt_mask_resized[mask_indices_gt]
+        ).astype(np.uint8)
+
+        # Concatenate left (predicted) and right (ground truth)
+        combined_frame = np.concatenate((blended_pred, blended_gt), axis=1)
+
+        out.write(combined_frame)
 
     cap.release()
     out.release()
-    print(f"Saved segmented video to {output_path}")
+    print(f"Saved comparison video to {output_path}")
 
 
-def main(video_path, checkpoint_path, output_path):
+def main(video_path, pkl_path, checkpoint_path, output_path):
     model = load_model(checkpoint_path)
-    masks, frame_ids = process_video(
-        video_path, model
-    )  # Get masks & exact frame selection
-    save_masks_as_video(video_path, masks, frame_ids, output_path)
+    masks, frame_ids = process_video(video_path, model)
+    gt_masks = extract_ground_truth_masks(pkl_path)
+    save_comparison_video(video_path, masks, frame_ids, gt_masks, output_path)
 
 
 if __name__ == "__main__":
@@ -172,21 +208,27 @@ if __name__ == "__main__":
         "--checkpoint_path", type=str, required=True, help="Path to model checkpoint"
     )
     parser.add_argument(
-        "--video_dir",
-        default="/home/veesion/Bag-detector/videos",
+        "--video_dir", type=str, required=True, help="Directory containing input videos"
+    )
+    parser.add_argument(
+        "--pkl_dir",
         type=str,
-        help="Directory containing input videos",
+        required=True,
+        help="Directory containing ground truth .pkl files",
     )
     parser.add_argument(
         "--output_dir",
-        default="output_masks",
+        default="comparison_videos",
         type=str,
-        help="Directory to save output videos",
+        help="Directory to save output",
     )
 
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
+
+    video_paths = sorted(glob.glob(os.path.join(args.video_dir, "*.mp4")))
+    pkl_paths = sorted(glob.glob(os.path.join(args.pkl_dir, "*.pkl")))
 
     video_paths = glob.glob(os.path.join(args.video_dir, "*.mp4"))
     data_dir = "/home/veesion/Bag-detector/valid_masks_tracks/"
@@ -202,4 +244,5 @@ if __name__ == "__main__":
         if os.path.splitext(video_name)[0] not in data_files:
             continue
         output_path = os.path.join(args.output_dir, video_name)
-        main(video_path, args.checkpoint_path, output_path)
+        pkl_path = os.path.join(data_dir, video_name + ".pkl")
+        main(video_path, pkl_path, args.checkpoint_path, output_path)
