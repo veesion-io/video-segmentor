@@ -242,5 +242,5 @@ if __name__ == "__main__":
         if os.path.splitext(video_name)[0] not in data_files:
             continue
         output_path = os.path.join(args.output_dir, video_name)
-        pkl_path = os.path.join(pkl_dir, video_name + ".pkl")
+        pkl_path = os.path.join(pkl_dir, video_name.replace(".mp4", ".pkl"))
         main(video_path, pkl_path, args.checkpoint_path, output_path)
