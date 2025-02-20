@@ -127,17 +127,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoint_path", type=str, help="Path to model checkpoint")
     parser.add_argument(
-        "video_dir",
+        "--video_dir",
         default="/home/veesion/Bag-detector/videos",
         type=str,
-        required=False,
         help="Directory containing input videos",
     )
     parser.add_argument(
-        "output_dir",
+        "--output_dir",
         default="output_masks",
         type=str,
-        required=False,
         help="Directory to save output masks",
     )
 
