@@ -208,13 +208,11 @@ if __name__ == "__main__":
         "--checkpoint_path", type=str, required=True, help="Path to model checkpoint"
     )
     parser.add_argument(
-        "--video_dir", type=str, required=True, help="Directory containing input videos"
-    )
-    parser.add_argument(
-        "--pkl_dir",
+        "--video_dir",
+        default="/home/veesion/Bag-detector/videos",
         type=str,
-        required=True,
-        help="Directory containing ground truth .pkl files",
+        required=False,
+        help="Directory containing input videos",
     )
     parser.add_argument(
         "--output_dir",
@@ -226,14 +224,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
+    pkl_dir = "/home/veesion/Bag-detector/valid_masks_tracks/"
 
     video_paths = sorted(glob.glob(os.path.join(args.video_dir, "*.mp4")))
-    pkl_paths = sorted(glob.glob(os.path.join(args.pkl_dir, "*.pkl")))
+    pkl_paths = sorted(glob.glob(os.path.join(pkl_dir, "*.pkl")))
 
     video_paths = glob.glob(os.path.join(args.video_dir, "*.mp4"))
-    data_dir = "/home/veesion/Bag-detector/valid_masks_tracks/"
     data_files = sorted(
-        [os.path.splitext(f)[0] for f in os.listdir(data_dir) if f.endswith(".pkl")]
+        [os.path.splitext(f)[0] for f in os.listdir(pkl_dir) if f.endswith(".pkl")]
     )
     np.random.seed(42)
     np.random.shuffle(data_files)
@@ -244,5 +242,5 @@ if __name__ == "__main__":
         if os.path.splitext(video_name)[0] not in data_files:
             continue
         output_path = os.path.join(args.output_dir, video_name)
-        pkl_path = os.path.join(data_dir, video_name + ".pkl")
+        pkl_path = os.path.join(pkl_dir, video_name + ".pkl")
         main(video_path, pkl_path, args.checkpoint_path, output_path)
