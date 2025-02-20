@@ -93,7 +93,7 @@ class VideoMaskDataset(Dataset):
             if start_frame_id + i * frame_interval < total_frames
         ]
 
-        for t, frame_id in enumerate(frame_ids):  # t is the index in our time dimension
+        for t, frame_id in enumerate(frame_ids):
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
             ret, frame = cap.read()
             if ret:
@@ -128,10 +128,17 @@ class VideoMaskDataset(Dataset):
 
         cap.release()
 
+        # Ensure correct shape for training
+        if len(frames) < self.num_frames:
+            pad_frames = self.num_frames - len(frames)
+            frames += [torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE))] * pad_frames  # Padding
+
         frames = torch.stack(frames)  # (T, C, H, W)
         if self.transform:
             frames = self.transform(frames)
         frames = frames.permute(1, 0, 2, 3)  # (C, T, H, W)
+
+        # Ensure masks are float32 and in correct shape
         masks = (
             torch.tensor(masks, dtype=torch.float32) / 255.0
         )  # (num_classes, T, H, W)
