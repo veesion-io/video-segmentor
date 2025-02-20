@@ -115,6 +115,8 @@ def process_video(video_path, model):
     cap = cv2.VideoCapture(video_path)
     video_fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     if not video_fps or video_fps <= 0:
         cap.release()
@@ -161,7 +163,7 @@ def process_video(video_path, model):
         output_masks = torch.sigmoid(model(frames))  # Get probability maps
         binary_masks = (output_masks > 0.5).float()  # Convert to binary masks
 
-    return binary_masks.cpu().numpy(), frame_ids
+    return binary_masks.cpu().numpy(), frame_ids, original_width, original_height
 
 
 def save_comparison_video(
@@ -228,8 +230,11 @@ def save_comparison_video(
 
 def main(video_path, pkl_path, checkpoint_path, output_path):
     model = load_model(checkpoint_path)
-    masks, frame_ids = process_video(video_path, model)
-    gt_masks = extract_ground_truth_masks(pkl_path, frame_ids)
+    masks, frame_ids, original_width, original_height = process_video(video_path, model)
+
+    gt_masks = extract_ground_truth_masks(
+        pkl_path, frame_ids, original_width, original_height
+    )
     save_comparison_video(video_path, masks, frame_ids, gt_masks, output_path)
 
 
