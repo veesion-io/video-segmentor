@@ -47,37 +47,45 @@ def load_model(checkpoint_path):
     return model.eval()
 
 
-def extract_ground_truth_masks(pkl_path):
+def extract_ground_truth_masks(pkl_path, frame_ids):
     """
-    Extract ground truth masks from the .pkl file.
-    Returns: (T, H, W, 3) numpy array with GT masks overlaid.
+    Extract **only the needed** ground truth masks from the .pkl file.
+    Returns:
+        - (T, H, W, 3) numpy array with GT masks overlaid.
     """
     with open(pkl_path, "rb") as f:
         data = pickle.load(f)
 
-    masks = np.zeros(
+    gt_masks = np.zeros(
         (NUM_FRAMES, IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8
     )  # (T, H, W, 3)
 
-    for track_id in data["tracks"]:
-        for frame_id, (_, contours, hierarchy) in data["tracks"][track_id].items():
-            class_id = data["classes"][track_id]
-            if 0 <= class_id < NUM_CLASSES:
-                cv2.drawContours(
-                    masks[frame_id],
-                    contours,
-                    -1,
-                    COLORS[class_id],
-                    thickness=cv2.FILLED,
-                    hierarchy=hierarchy,
-                )
+    for i, frame_id in enumerate(frame_ids):  # Process only required frames
+        mask_frame = np.zeros(
+            (IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8
+        )  # Empty frame
+        for track_id in data["tracks"]:
+            if frame_id in data["tracks"][track_id]:
+                _, contours, hierarchy = data["tracks"][track_id][frame_id]
+                class_id = data["classes"][track_id]
+                if 0 <= class_id < NUM_CLASSES:
+                    cv2.drawContours(
+                        mask_frame,
+                        contours,
+                        -1,
+                        COLORS[class_id],
+                        thickness=cv2.FILLED,
+                        hierarchy=hierarchy,
+                    )
+        gt_masks[i] = mask_frame  # Store only the relevant frame
 
-    return masks
+    return gt_masks
 
 
 def process_video(video_path, model):
     """
     Process the input video and predict segmentation masks using a fixed window duration and target FPS.
+
     Returns:
         - binary_masks: numpy array of shape (1, NUM_CLASSES, T, H, W)
         - frame_ids: list of selected frame indices
@@ -199,7 +207,7 @@ def save_comparison_video(
 def main(video_path, pkl_path, checkpoint_path, output_path):
     model = load_model(checkpoint_path)
     masks, frame_ids = process_video(video_path, model)
-    gt_masks = extract_ground_truth_masks(pkl_path)
+    gt_masks = extract_ground_truth_masks(pkl_path, frame_ids)
     save_comparison_video(video_path, masks, frame_ids, gt_masks, output_path)
 
 
