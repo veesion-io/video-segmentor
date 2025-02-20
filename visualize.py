@@ -191,7 +191,7 @@ if __name__ == "__main__":
     video_paths = glob.glob(os.path.join(args.video_dir, "*.mp4"))
     data_dir = "/home/veesion/Bag-detector/valid_masks_tracks/"
     data_files = sorted(
-        [os.path.spliext(f)[0] for f in os.listdir(data_dir) if f.endswith(".pkl")]
+        [os.path.splitext(f)[0] for f in os.listdir(data_dir) if f.endswith(".pkl")]
     )
     np.random.seed(42)
     np.random.shuffle(data_files)
