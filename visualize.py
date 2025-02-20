@@ -31,7 +31,7 @@ COLORS = [
 
 
 def load_model(model, checkpoint_path):
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    checkpoint = torch.load(checkpoint_path)
     new_state_dict = {
         k.replace("_orig_mod.", ""): v for k, v in checkpoint.items()
     }  # Remove _orig_mod. prefix
