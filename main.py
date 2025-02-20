@@ -12,7 +12,7 @@ from model import TemporalUNetTransformer  # Ensure your model class is in model
 
 NUM_CLASSES = 13
 TARGET_FPS = 3
-VIDEO_DURATION = 8
+VIDEO_DURATION = 8.333334
 IMAGE_SIZE = 224
 NUM_FRAMES = int(VIDEO_DURATION * TARGET_FPS)
 BATCH_SIZE = 4
