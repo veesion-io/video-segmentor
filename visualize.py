@@ -30,7 +30,10 @@ COLORS = [
 ]
 
 
-def load_model(model, checkpoint_path):
+def load_model(checkpoint_path):
+    model = TemporalUNetTransformer(
+        NUM_CLASSES, num_frames=NUM_FRAMES, image_size=IMAGE_SIZE
+    ).to("cuda")
     checkpoint = torch.load(checkpoint_path)
     new_state_dict = {
         k.replace("_orig_mod.", ""): v for k, v in checkpoint.items()
@@ -113,9 +116,8 @@ def save_masks_as_video(masks, output_path, fps=5):
 
 
 def main(video_path, checkpoint_path, output_path):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = load_model(checkpoint_path, device)
-    masks = process_video(video_path, model, device)
+    model = load_model(checkpoint_path)
+    masks = process_video(video_path, model)
     save_masks_as_video(masks, output_path)
 
 
