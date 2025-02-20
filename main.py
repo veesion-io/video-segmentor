@@ -81,7 +81,7 @@ class VideoMaskDataset(Dataset):
         # Compute the exact frame IDs to fetch
         frame_interval = video_fps / self.target_fps
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total_frames > self.duration * video_fps:
+        if int(total_frames - self.duration * video_fps) > 0:
             start_frame_id = np.random.choice(
                 int(total_frames - self.duration * video_fps)
             )
