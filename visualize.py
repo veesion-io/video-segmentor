@@ -3,6 +3,8 @@ import torchvision.transforms as transforms
 import cv2
 import numpy as np
 import os
+import glob
+import argparse
 from model import TemporalUNetTransformer  # Ensure your model class is in model.py
 
 NUM_CLASSES = 13
@@ -31,10 +33,13 @@ COLORS = [
 
 
 def load_model(checkpoint_path):
+    """
+    Load the trained segmentation model.
+    """
     model = TemporalUNetTransformer(
         NUM_CLASSES, num_frames=NUM_FRAMES, image_size=IMAGE_SIZE
     ).to("cuda")
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, map_location="cuda")
     new_state_dict = {
         k.replace("_orig_mod.", ""): v for k, v in checkpoint.items()
     }  # Remove _orig_mod. prefix
@@ -73,6 +78,7 @@ def process_video(video_path, model):
     )
 
     frames = []
+    original_frames = []
     for frame_id in frame_ids:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
         ret, frame = cap.read()
@@ -80,16 +86,23 @@ def process_video(video_path, model):
             frames.append(
                 torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE))
             )  # Placeholder if frame missing
+            original_frames.append(
+                np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8)
+            )
             continue
 
-        frame_tensor = transform(frame)
+        original_resized = cv2.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
+        original_frames.append(original_resized)
+
+        frame_tensor = transform(original_resized)
         frames.append(frame_tensor)
 
     cap.release()
 
-    # Ensure we have exactly NUM_FRAMES (pad with zeros if needed)
+    # Ensure we have exactly NUM_FRAMES (pad with black frames if needed)
     while len(frames) < NUM_FRAMES:
         frames.append(torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE)))
+        original_frames.append(np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8))
 
     frames = (
         torch.stack(frames).permute(1, 0, 2, 3).unsqueeze(0).to("cuda")
@@ -102,10 +115,11 @@ def process_video(video_path, model):
     return binary_masks.cpu().numpy()
 
 
-def save_masks_as_video(masks, output_path, fps=5):
+def save_masks_as_video(video_path, masks, output_path, fps=TARGET_FPS, alpha=0.5):
     """
-    Save the predicted masks as an MP4 video.
+    Save the original video with segmentation masks overlaid.
     """
+    cap = cv2.VideoCapture(video_path)
     height, width = IMAGE_SIZE, IMAGE_SIZE
     num_frames = masks.shape[1]  # T dimension
 
@@ -113,32 +127,41 @@ def save_masks_as_video(masks, output_path, fps=5):
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
     for t in range(num_frames):
-        mask_frame = np.zeros((height, width, 3), dtype=np.uint8)
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame = cv2.resize(frame, (width, height))  # Resize to match mask size
+
+        mask_frame = np.zeros_like(frame, dtype=np.uint8)  # Same shape as frame
         for class_id in range(NUM_CLASSES):
             mask = masks[0, class_id, t]  # (H, W)
             color = np.array(COLORS[class_id], dtype=np.uint8)
 
-            mask_frame[mask > 0] = color  # Apply class color
-            if np.any(mask > 0):
-                print("found amsks")
-        out.write(mask_frame)
+            mask_indices = mask > 0
+            mask_frame[mask_indices] = color  # Apply class color
 
+        # Blend the mask onto the original frame
+        overlay = cv2.addWeighted(frame, 1 - alpha, mask_frame, alpha, 0)
+
+        out.write(overlay)
+
+    cap.release()
     out.release()
-    print(f"Saved segmentation video to {output_path}")
+    print(f"Saved segmented video to {output_path}")
 
 
 def main(video_path, checkpoint_path, output_path):
     model = load_model(checkpoint_path)
     masks = process_video(video_path, model)
-    save_masks_as_video(masks, output_path)
+    save_masks_as_video(video_path, masks, output_path)
 
-
-import argparse
-import glob
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint_path", type=str, help="Path to model checkpoint")
+    parser.add_argument(
+        "--checkpoint_path", type=str, required=True, help="Path to model checkpoint"
+    )
     parser.add_argument(
         "--video_dir",
         default="/home/veesion/Bag-detector/videos",
@@ -149,7 +172,7 @@ if __name__ == "__main__":
         "--output_dir",
         default="output_masks",
         type=str,
-        help="Directory to save output masks",
+        help="Directory to save output videos",
     )
 
     args = parser.parse_args()
