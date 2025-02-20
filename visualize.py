@@ -60,7 +60,7 @@ def extract_ground_truth_masks(pkl_path):
     )  # (T, H, W, 3)
 
     for track_id in data["tracks"]:
-        for frame_id, (_, contours) in data["tracks"][track_id].items():
+        for frame_id, (_, contours, hierarchy) in data["tracks"][track_id].items():
             class_id = data["classes"][track_id]
             if 0 <= class_id < NUM_CLASSES:
                 cv2.drawContours(
@@ -69,6 +69,7 @@ def extract_ground_truth_masks(pkl_path):
                     -1,
                     COLORS[class_id],
                     thickness=cv2.FILLED,
+                    hierarchy=hierarchy,
                 )
 
     return masks
