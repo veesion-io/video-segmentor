@@ -130,12 +130,14 @@ if __name__ == "__main__":
         "video_dir",
         default="/home/veesion/Bag-detector/videos",
         type=str,
+        required=False,
         help="Directory containing input videos",
     )
     parser.add_argument(
         "output_dir",
         default="output_masks",
         type=str,
+        required=False,
         help="Directory to save output masks",
     )
 
