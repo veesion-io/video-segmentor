@@ -4,11 +4,13 @@ import cv2
 import numpy as np
 import os
 from model import TemporalUNetTransformer  # Ensure your model class is in model.py
-from dataset import (
-    IMAGE_SIZE,
-    NUM_CLASSES,
-    NUM_FRAMES,
-)  # Ensure constants are accessible
+
+NUM_CLASSES = 13
+TARGET_FPS = 5
+VIDEO_DURATION = 5
+IMAGE_SIZE = 224
+NUM_FRAMES = int(VIDEO_DURATION * TARGET_FPS)
+BATCH_SIZE = 4
 
 # Color map for 13 classes
 COLORS = [
