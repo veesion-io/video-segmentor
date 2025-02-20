@@ -30,16 +30,15 @@ COLORS = [
 ]
 
 
-def load_model(checkpoint_path, device):
-    """
-    Load the trained model from a checkpoint.
-    """
-    model = TemporalUNetTransformer(
-        NUM_CLASSES, num_frames=NUM_FRAMES, image_size=IMAGE_SIZE
-    ).to(device)
-    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
-    model.eval()
-    return model
+def load_model(model, checkpoint_path):
+    checkpoint = torch.load(
+        checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu"
+    )
+    new_state_dict = {
+        k.replace("_orig_mod.", ""): v for k, v in checkpoint.items()
+    }  # Remove _orig_mod. prefix
+    model.load_state_dict(new_state_dict, strict=False)
+    return model.eval()
 
 
 def process_video(video_path, model, device):
