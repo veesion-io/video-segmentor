@@ -47,11 +47,19 @@ def load_model(checkpoint_path):
     return model.eval()
 
 
-def extract_ground_truth_masks(pkl_path, frame_ids):
+def extract_ground_truth_masks(pkl_path, frame_ids, original_width, original_height):
     """
-    Extract **only the needed** ground truth masks from the .pkl file.
+    Extract **only the needed** ground truth masks from the .pkl file,
+    rescaling contours to match IMAGE_SIZE.
+
+    Args:
+        pkl_path (str): Path to the ground truth .pkl file.
+        frame_ids (list): List of selected frame indices.
+        original_width (int): Actual width of the video frames.
+        original_height (int): Actual height of the video frames.
+
     Returns:
-        - (T, H, W, 3) numpy array with GT masks overlaid.
+        - gt_masks: (NUM_FRAMES, IMAGE_SIZE, IMAGE_SIZE, 3) numpy array with GT masks overlaid.
     """
     with open(pkl_path, "rb") as f:
         data = pickle.load(f)
@@ -60,23 +68,37 @@ def extract_ground_truth_masks(pkl_path, frame_ids):
         (NUM_FRAMES, IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8
     )  # (T, H, W, 3)
 
+    # Compute scaling factors
+    scale_x = IMAGE_SIZE / original_width
+    scale_y = IMAGE_SIZE / original_height
+
     for i, frame_id in enumerate(frame_ids):  # Process only required frames
         mask_frame = np.zeros(
             (IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8
         )  # Empty frame
+
         for track_id in data["tracks"]:
             if frame_id in data["tracks"][track_id]:
                 _, contours, hierarchy = data["tracks"][track_id][frame_id]
                 class_id = data["classes"][track_id]
+
                 if 0 <= class_id < NUM_CLASSES:
+                    # Rescale contours to IMAGE_SIZE
+                    rescaled_contours = [
+                        (contour * np.array([scale_x, scale_y])).astype(np.int32)
+                        for contour in contours
+                    ]
+
+                    # Draw resized contours
                     cv2.drawContours(
                         mask_frame,
-                        contours,
+                        rescaled_contours,
                         -1,
                         COLORS[class_id],
                         thickness=cv2.FILLED,
                         hierarchy=hierarchy,
                     )
+
         gt_masks[i] = mask_frame  # Store only the relevant frame
 
     return gt_masks
