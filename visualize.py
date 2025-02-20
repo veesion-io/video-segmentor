@@ -42,7 +42,7 @@ def load_model(checkpoint_path):
     return model.eval()
 
 
-def process_video(video_path, model, device):
+def process_video(video_path, model):
     """
     Process the input video and predict segmentation masks.
     """
@@ -79,7 +79,7 @@ def process_video(video_path, model, device):
     cap.release()
 
     frames = (
-        torch.stack(frames).permute(1, 0, 2, 3).unsqueeze(0).to(device)
+        torch.stack(frames).permute(1, 0, 2, 3).unsqueeze(0).to("cuda")
     )  # (1, C, T, H, W)
 
     with torch.no_grad():
