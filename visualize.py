@@ -117,34 +117,44 @@ def process_video(video_path, model):
 
 def save_masks_as_video(video_path, masks, output_path, fps=TARGET_FPS, alpha=0.5):
     """
-    Save the original video with segmentation masks overlaid.
+    Save the original video with segmentation masks overlaid correctly,
+    resizing the masks instead of the frames.
     """
     cap = cv2.VideoCapture(video_path)
-    height, width = IMAGE_SIZE, IMAGE_SIZE
+    original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     num_frames = masks.shape[1]  # T dimension
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    out = cv2.VideoWriter(output_path, fourcc, fps, (original_width, original_height))
 
     for t in range(num_frames):
         ret, frame = cap.read()
         if not ret:
-            break
+            break  # Stop if we run out of frames
 
-        frame = cv2.resize(frame, (width, height))  # Resize to match mask size
-
-        mask_frame = np.zeros_like(frame, dtype=np.uint8)  # Same shape as frame
+        mask_frame = np.zeros_like(frame, dtype=np.uint8)  # Blank mask
         for class_id in range(NUM_CLASSES):
             mask = masks[0, class_id, t]  # (H, W)
             color = np.array(COLORS[class_id], dtype=np.uint8)
 
-            mask_indices = mask > 0
-            mask_frame[mask_indices] = color  # Apply class color
+            # Resize mask to match the original frame size
+            resized_mask = cv2.resize(
+                mask, (original_width, original_height), interpolation=cv2.INTER_NEAREST
+            )
 
-        # Blend the mask onto the original frame
-        overlay = cv2.addWeighted(frame, 1 - alpha, mask_frame, alpha, 0)
+            # Apply mask only on detected areas
+            mask_indices = resized_mask > 0
+            mask_frame[mask_indices] = color  # Colorize detected areas
 
-        out.write(overlay)
+        # Blend only the mask regions onto the original frame
+        blended_frame = frame.copy()
+        mask_indices = mask_frame.sum(axis=2) > 0  # Detect where masks exist
+        blended_frame[mask_indices] = (
+            (1 - alpha) * frame[mask_indices] + alpha * mask_frame[mask_indices]
+        ).astype(np.uint8)
+
+        out.write(blended_frame)
 
     cap.release()
     out.release()
