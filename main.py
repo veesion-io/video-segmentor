@@ -404,7 +404,7 @@ def train_model(data_dir, epochs=20, batch_size=BATCH_SIZE, lr=1e-4):
         writer.add_scalar("Accuracy/Val", pixel_accuracy, epoch + 1)
 
         print(
-            f"Epoch [{epoch + 1}/{epochs}], Train loss: {avg_val_loss:.4f}, "
+            f"Epoch [{epoch + 1}/{epochs}], Val loss: {avg_val_loss:.4f}, "
             f"Pixel Accuracy: {pixel_accuracy:.4f}, Baseline Accuracy: {baseline_accuracy:.4f}"
         )
         torch.save(
