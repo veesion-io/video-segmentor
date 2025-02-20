@@ -50,6 +50,9 @@ def load_model(checkpoint_path):
 def process_video(video_path, model):
     """
     Process the input video and predict segmentation masks using a fixed window duration and target FPS.
+    Returns:
+        - binary_masks: numpy array of shape (1, NUM_CLASSES, T, H, W)
+        - frame_ids: list of selected frame indices
     """
     cap = cv2.VideoCapture(video_path)
     video_fps = cap.get(cv2.CAP_PROP_FPS)
@@ -59,7 +62,7 @@ def process_video(video_path, model):
         cap.release()
         raise ValueError(f"Invalid FPS detected in video: {video_path}")
 
-    # Compute frame interval to match TARGET_FPS
+    # Compute exact frame selection to maintain alignment
     frame_interval = video_fps / TARGET_FPS
     start_frame_id = 0  # Start from the beginning
     frame_ids = [
@@ -71,30 +74,23 @@ def process_video(video_path, model):
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            transforms.Resize(
+                (IMAGE_SIZE, IMAGE_SIZE)
+            ),  # Keep original frames untouched
             transforms.ConvertImageDtype(torch.float32),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
 
     frames = []
-    original_frames = []
     for frame_id in frame_ids:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
         ret, frame = cap.read()
         if not ret:
-            frames.append(
-                torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE))
-            )  # Placeholder if frame missing
-            original_frames.append(
-                np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8)
-            )
+            frames.append(torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE)))
             continue
 
-        original_resized = cv2.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
-        original_frames.append(original_resized)
-
-        frame_tensor = transform(original_resized)
+        frame_tensor = transform(frame)
         frames.append(frame_tensor)
 
     cap.release()
@@ -102,36 +98,37 @@ def process_video(video_path, model):
     # Ensure we have exactly NUM_FRAMES (pad with black frames if needed)
     while len(frames) < NUM_FRAMES:
         frames.append(torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE)))
-        original_frames.append(np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8))
 
     frames = (
         torch.stack(frames).permute(1, 0, 2, 3).unsqueeze(0).to("cuda")
     )  # (1, C, T, H, W)
 
     with torch.no_grad():
-        output_masks = torch.sigmoid(model(frames))  # Get probability maps
-        binary_masks = (output_masks > 0.5).float()  # Convert to binary masks
+        output_masks = torch.sigmoid(model(frames))
+        binary_masks = (output_masks > 0.5).float()
 
-    return binary_masks.cpu().numpy()
+    return binary_masks.cpu().numpy(), frame_ids
 
 
-def save_masks_as_video(video_path, masks, output_path, fps=TARGET_FPS, alpha=0.5):
+def save_masks_as_video(
+    video_path, masks, frame_ids, output_path, fps=TARGET_FPS, alpha=0.5
+):
     """
-    Save the original video with segmentation masks overlaid correctly,
-    resizing the masks instead of the frames.
+    Save the original video with segmentation masks overlaid correctly.
+    Reads frames explicitly using frame_ids to ensure proper alignment.
     """
     cap = cv2.VideoCapture(video_path)
     original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    num_frames = masks.shape[1]  # T dimension
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_path, fourcc, fps, (original_width, original_height))
 
-    for t in range(num_frames):
+    for t, frame_id in enumerate(frame_ids):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
         ret, frame = cap.read()
         if not ret:
-            break  # Stop if we run out of frames
+            break
 
         mask_frame = np.zeros_like(frame, dtype=np.uint8)  # Blank mask
         for class_id in range(NUM_CLASSES):
@@ -163,8 +160,10 @@ def save_masks_as_video(video_path, masks, output_path, fps=TARGET_FPS, alpha=0.
 
 def main(video_path, checkpoint_path, output_path):
     model = load_model(checkpoint_path)
-    masks = process_video(video_path, model)
-    save_masks_as_video(video_path, masks, output_path)
+    masks, frame_ids = process_video(
+        video_path, model
+    )  # Get masks & exact frame selection
+    save_masks_as_video(video_path, masks, frame_ids, output_path)
 
 
 if __name__ == "__main__":
