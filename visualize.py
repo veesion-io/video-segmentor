@@ -189,7 +189,17 @@ if __name__ == "__main__":
     os.makedirs(args.output_dir, exist_ok=True)
 
     video_paths = glob.glob(os.path.join(args.video_dir, "*.mp4"))
+    data_dir = "/home/veesion/Bag-detector/valid_masks_tracks/"
+    data_files = sorted(
+        [os.path.spliext(f)[0] for f in os.listdir(data_dir) if f.endswith(".pkl")]
+    )
+    np.random.seed(42)
+    np.random.shuffle(data_files)
+    data_files = data_files[: int(0.9 * len(data_files))]
 
     for video_path in video_paths:
-        output_path = os.path.join(args.output_dir, os.path.basename(video_path))
+        video_name = os.path.basename(video_path)
+        if os.path.splitext(video_name)[0] not in data_files:
+            continue
+        output_path = os.path.join(args.output_dir, video_name)
         main(video_path, args.checkpoint_path, output_path)
