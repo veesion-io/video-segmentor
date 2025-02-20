@@ -34,7 +34,9 @@ def load_model(checkpoint_path, device):
     """
     Load the trained model from a checkpoint.
     """
-    model = TemporalUNetTransformer(NUM_CLASSES, num_frames=NUM_FRAMES).to(device)
+    model = TemporalUNetTransformer(
+        NUM_CLASSES, num_frames=NUM_FRAMES, image_size=IMAGE_SIZE
+    ).to(device)
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model.eval()
     return model
