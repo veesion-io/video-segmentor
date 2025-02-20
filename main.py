@@ -70,6 +70,14 @@ class VideoMaskDataset(Dataset):
             cap.release()
             raise ValueError(f"Invalid FPS detected in video: {video_name}")
 
+        # Get original frame dimensions
+        original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        # Compute scaling factors
+        scale_x = IMAGE_SIZE / original_width
+        scale_y = IMAGE_SIZE / original_height
+
         # Compute the exact frame IDs to fetch
         frame_interval = video_fps / self.target_fps
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -84,27 +92,34 @@ class VideoMaskDataset(Dataset):
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
             ret, frame = cap.read()
             if ret:
-                frame_data = transforms.ToTensor()(
-                    cv2.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
-                )
+                frame_resized = cv2.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
+                frame_data = transforms.ToTensor()(frame_resized)
             else:
-                frame_data = torch.zeros(
-                    (3, IMAGE_SIZE, IMAGE_SIZE)
-                )  # Placeholder if frame missing
+                frame_data = torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE))  # Placeholder
 
             frames.append(frame_data)
 
             # Process masks for each track_id
             for track_id in data["tracks"]:
                 if frame_id in data["tracks"][track_id]:
-                    contours = data["tracks"][track_id][frame_id][1]  # Extract contours
-                    class_id = data["classes"][track_id]  # Get class for this track_id
-                    if (
-                        0 <= class_id < self.num_classes
-                    ):  # Ensure class_id is within range
-                        cv2.drawContours(
-                            masks[class_id, t], contours, -1, 255, thickness=cv2.FILLED
-                        )
+                    _, contours, hierarchy = data["tracks"][track_id][frame_id]
+                    class_id = data["classes"][track_id]
+
+                    # Rescale contours to IMAGE_SIZE
+                    rescaled_contours = [
+                        (contour * np.array([scale_x, scale_y])).astype(np.int32)
+                        for contour in contours
+                    ]
+
+                    # Draw resized contours
+                    cv2.drawContours(
+                        masks[class_id, t],
+                        rescaled_contours,
+                        -1,
+                        255,
+                        thickness=cv2.FILLED,
+                        hierarchy=hierarchy,
+                    )
 
         cap.release()
 
