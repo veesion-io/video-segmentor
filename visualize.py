@@ -44,11 +44,24 @@ def load_model(checkpoint_path):
 
 def process_video(video_path, model):
     """
-    Process the input video and predict segmentation masks.
+    Process the input video and predict segmentation masks using a fixed window duration and target FPS.
     """
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    if not video_fps or video_fps <= 0:
+        cap.release()
+        raise ValueError(f"Invalid FPS detected in video: {video_path}")
+
+    # Compute frame interval to match TARGET_FPS
+    frame_interval = video_fps / TARGET_FPS
+    start_frame_id = 0  # Start from the beginning
+    frame_ids = [
+        start_frame_id + int(round(i * frame_interval))
+        for i in range(NUM_FRAMES)
+        if start_frame_id + i * frame_interval < total_frames
+    ]
 
     transform = transforms.Compose(
         [
@@ -60,10 +73,6 @@ def process_video(video_path, model):
     )
 
     frames = []
-    frame_ids = np.linspace(
-        0, total_frames - 1, NUM_FRAMES, dtype=int
-    )  # Sample NUM_FRAMES frames evenly
-
     for frame_id in frame_ids:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
         ret, frame = cap.read()
@@ -78,15 +87,17 @@ def process_video(video_path, model):
 
     cap.release()
 
+    # Ensure we have exactly NUM_FRAMES (pad with zeros if needed)
+    while len(frames) < NUM_FRAMES:
+        frames.append(torch.zeros((3, IMAGE_SIZE, IMAGE_SIZE)))
+
     frames = (
         torch.stack(frames).permute(1, 0, 2, 3).unsqueeze(0).to("cuda")
     )  # (1, C, T, H, W)
 
     with torch.no_grad():
-        output_masks = torch.sigmoid(
-            model(frames)
-        )  # Apply sigmoid to get probabilities
-        binary_masks = (output_masks > 0.5).float()  # Thresholding to get binary masks
+        output_masks = torch.sigmoid(model(frames))  # Get probability maps
+        binary_masks = (output_masks > 0.5).float()  # Convert to binary masks
 
     return binary_masks.cpu().numpy()
 
@@ -108,7 +119,8 @@ def save_masks_as_video(masks, output_path, fps=5):
             color = np.array(COLORS[class_id], dtype=np.uint8)
 
             mask_frame[mask > 0] = color  # Apply class color
-
+            if np.any(mask > 0):
+                print("found amsks")
         out.write(mask_frame)
 
     out.release()
