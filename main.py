@@ -45,7 +45,7 @@ class VideoMaskDataset(Dataset):
         self.video_path = "/home/veesion/Bag-detector/videos/"
         self.target_fps = target_fps
         self.duration = duration
-        self.num_frames = target_fps * duration
+        self.num_frames = int(target_fps * duration)
         self.num_classes = num_classes
         self.transform = transform
 
