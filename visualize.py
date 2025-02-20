@@ -124,7 +124,7 @@ import glob
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("checkpoint_path", type=str, help="Path to model checkpoint")
+    parser.add_argument("--checkpoint_path", type=str, help="Path to model checkpoint")
     parser.add_argument(
         "--video_dir",
         default="/home/veesion/Bag-detector/videos",
