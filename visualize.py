@@ -271,7 +271,7 @@ if __name__ == "__main__":
     )
     np.random.seed(42)
     np.random.shuffle(data_files)
-    data_files = data_files[: int(0.9 * len(data_files))]
+    data_files = data_files[int(0.9 * len(data_files)) :]
 
     for video_path in video_paths:
         video_name = os.path.basename(video_path)
